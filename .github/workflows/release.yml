@@ -1,0 +1,129 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to publish, for example v0.1.1"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  macos-release:
+    name: Build and publish macOS release
+    runs-on: macos-15
+
+    env:
+      APP_NAME: OpenScrobbler
+      PROJECT: OpenScrobbler.xcodeproj
+      SCHEME: OpenScrobbler
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve release tag
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            tag="${{ inputs.tag }}"
+            git fetch --tags --force
+            git checkout "$tag"
+          else
+            tag="${GITHUB_REF_NAME}"
+          fi
+
+          version="${tag#v}"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "asset=${APP_NAME}-${version}-macOS.zip" >> "$GITHUB_OUTPUT"
+
+      - name: Run tests
+        run: |
+          xcodebuild test \
+            -project "$PROJECT" \
+            -scheme "$SCHEME" \
+            -destination 'platform=macOS'
+
+      - name: Build release app
+        run: |
+          xcodebuild build \
+            -project "$PROJECT" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -destination 'platform=macOS' \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData"
+
+      - name: Package app
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          app_path="$RUNNER_TEMP/DerivedData/Build/Products/Release/${APP_NAME}.app"
+          asset_path="$RUNNER_TEMP/${{ steps.release.outputs.asset }}"
+
+          test -d "$app_path"
+          ditto -c -k --keepParent "$app_path" "$asset_path"
+
+          echo "asset_path=$asset_path" >> "$GITHUB_OUTPUT"
+
+      - name: Build release notes
+        shell: bash
+        run: |
+          python3 - <<'PY' > "$RUNNER_TEMP/release-notes.md"
+          from pathlib import Path
+          import os
+          import re
+
+          version = os.environ["RELEASE_VERSION"]
+          changelog = Path("CHANGELOG.md").read_text(encoding="utf-8")
+          pattern = rf"^##\s+{re.escape(version)}(?:\s+-[^\n]*)?\n(?P<body>.*?)(?=^##\s+|\Z)"
+          match = re.search(pattern, changelog, flags=re.MULTILINE | re.DOTALL)
+
+          if match:
+              body = match.group("body").strip()
+          else:
+              body = f"OpenScrobbler {version} release."
+
+          print(body)
+          print()
+          print("### Build Verification")
+          print()
+          print("- GitHub Actions ran the macOS test suite before packaging.")
+          print("- The attached macOS app is locally signed by the workflow and is not notarized yet.")
+          PY
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+
+      - name: Publish GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+          VERSION: ${{ steps.release.outputs.version }}
+          ASSET_PATH: ${{ steps.package.outputs.asset_path }}
+        run: |
+          set -euo pipefail
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" \
+              --title "OpenScrobbler $VERSION" \
+              --notes-file "$RUNNER_TEMP/release-notes.md"
+            gh release upload "$TAG" "$ASSET_PATH" --clobber
+          else
+            gh release create "$TAG" "$ASSET_PATH" \
+              --title "OpenScrobbler $VERSION" \
+              --notes-file "$RUNNER_TEMP/release-notes.md"
+          fi

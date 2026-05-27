@@ -72,4 +72,5 @@ Implementation work should stay aligned with the open ecosystem instead of inven
 
 - `docs/OPEN_ECOSYSTEM_REFERENCES.md`
 - `docs/LISTENBRAINZ_INTEGRATION.md`
+- `docs/RELEASE_PROCESS.md`
 - `ROADMAP.md`
