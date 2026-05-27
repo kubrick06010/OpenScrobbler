@@ -1,0 +1,34 @@
+{
+  "payload": {
+    "artist_map": [
+      {
+        "country": "USA",
+        "artist_count": 20,
+        "listen_count": 44,
+        "artists": [
+          {
+            "artist_name": "Oneohtrix Point Never",
+            "artist_mbid": "opn-mbid",
+            "listen_count": 30
+          }
+        ]
+      },
+      {
+        "country": "GBR",
+        "artist_count": 14,
+        "listen_count": 28,
+        "artists": [
+          {
+            "artist_name": "Broadcast",
+            "artist_mbid": "broadcast-mbid",
+            "listen_count": 18
+          }
+        ]
+      }
+    ],
+    "range": "year",
+    "from_ts": 100,
+    "to_ts": 200,
+    "last_updated": 1700000000
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "payload": [
+    {
+      "user_name": "alice",
+      "similarity": 0.82
+    },
+    {
+      "user_name": "bob",
+      "similarity": 0.46
+    }
+  ]
+}

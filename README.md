@@ -1,55 +1,75 @@
 # OpenScrobbler
 
-OpenScrobbler is a macOS scrobbler and listening companion built around ListenBrainz, MusicBrainz, and open music data.
+OpenScrobbler is a macOS SwiftUI app for open listening history, centered on ListenBrainz, MusicBrainz, and local-first music memory.
 
-The project starts from lessons learned while building a Last.fm-focused desktop app: player monitoring, reliable scrobble thresholds, offline queueing, now-playing updates, charts, social graph exploration, menu bar controls, diagnostics, and local-first music memory features. The new goal is not to regress from that work. The goal is to rebuild it as a stronger, open-first app where ListenBrainz is the primary account, API, archive, and social substrate.
+The current app includes:
 
-## Product Idea
+- ListenBrainz token-based account setup with local app-owned token storage.
+- Now playing and completed listen submission.
+- Offline queueing with per-backend retry state.
+- Charts, listening archive views, and social graph experiments shaped around open data.
+- Local-first shared music and obsession vault experiments.
+- Menu bar controls, launch-at-login, proxy settings, diagnostics, and player monitoring.
 
-OpenScrobbler should feel like a native desktop home for open listening history:
+## Direction
 
-- Submit now-playing and completed listens to ListenBrainz.
-- Keep a resilient local queue when the network or API is unavailable.
-- Show charts for artists, recordings, releases, and listening periods.
-- Preserve social discovery through ListenBrainz-compatible follows, public listens, similar users, playlists, pins, and local graph analysis.
-- Use MusicBrainz identifiers whenever possible so data stays portable.
-- Keep local-first shared music and obsession-style memory features, but express them as open archives rather than legacy service rituals.
-- Provide a polished macOS menu bar and main-window experience.
+ListenBrainz is the primary service. Compatibility code may remain temporarily as an adapter/reference during migration, but product language, onboarding, storage names, and feature work should be ListenBrainz-first.
 
-## Migration Plan
+Charts and social features stay in scope. The goal is not to remove social music discovery, but to rebuild it on ListenBrainz-compatible concepts such as public listens, follows, similar users, MusicBrainz identifiers, playlists, pins, recommendations, and portable local archives.
 
-1. Establish the standalone app identity.
-   - Use `OpenScrobbler` as the product, module, bundle, storage, and keychain identity.
-   - Remove Last.fm labels from onboarding, settings, diagnostics, menu bar copy, docs, and exported bundle schemas.
-   - Rework the account section into a ListenBrainz account panel with token validation, username discovery, connection status, and submission toggles.
+## Build
 
-2. Make ListenBrainz the primary backend.
-   - Route now-playing and completed-listen submission through the native ListenBrainz API.
-   - Make the queue backend-neutral internally, but default to ListenBrainz-only.
-   - Keep Last.fm-era logic only as temporary reference code until it is replaced by provider-neutral models.
+Requirements:
 
-3. Preserve and upgrade existing features.
-   - Port player monitoring, threshold rules, deduplication, retry backoff, proxy settings, launch-at-login, diagnostics, and menu bar controls.
-   - Keep charts and social graph views, but rebuild their data sources around ListenBrainz stats, listens, follows, similar users, playlists, and MusicBrainz metadata.
-   - Replace Last.fm profile, friend, neighbour, subscriber, and badge concepts with ListenBrainz-native identity and social concepts.
+- macOS 13 or newer.
+- Xcode with the macOS SDK.
+- XcodeGen if you want to regenerate the checked-in project from `project.yml`.
 
-4. Model the app around open music entities.
-   - Prefer `Listen`, `Recording`, `Release`, `Artist`, `Playlist`, `User`, and `Connection` over legacy scrobble/profile terms where practical.
-   - Store MBIDs alongside display names when available.
-   - Keep UI forgiving when metadata is partial.
+Generate the Xcode project:
 
-5. Build the first functional baseline.
-   - Launch the app with a ListenBrainz account panel.
-   - Validate a user token.
-   - Submit now-playing and completed listens.
-   - Queue and retry failed submissions.
-   - Show recent listens and at least one chart view from ListenBrainz.
+```bash
+xcodegen generate
+```
 
-6. Expand into open social discovery.
-   - Add social graph exploration using ListenBrainz relationships and public listening overlap.
-   - Add shared playlists or portable bundles as the open replacement for legacy share flows.
-   - Keep local memory features as user-owned data with import/export.
+Build from the command line:
 
-## Status
+```bash
+xcodebuild build \
+  -project OpenScrobbler.xcodeproj \
+  -scheme OpenScrobbler \
+  -destination 'platform=macOS'
+```
 
-This repository is being created as the clean home for the OpenScrobbler effort. Full source migration will follow after the ListenBrainz-first architecture is rewired and the old Last.fm-centered labels and assumptions are retired.
+Run tests:
+
+```bash
+xcodebuild test \
+  -project OpenScrobbler.xcodeproj \
+  -scheme OpenScrobbler \
+  -destination 'platform=macOS'
+```
+
+## Migration Notes
+
+The transplant is intentionally incremental:
+
+- `ListenBrainzService` is the native API surface for validation, now playing, listens, stats, and recent-listen reads.
+- `ScrobbleService` still contains some migration-era naming that should be retired behind provider-neutral types.
+- Profile, social, charts, vaults, and queue UI should be renamed around listens, people, recordings, releases, and open archives.
+- Compatibility-provider-specific account panes, badges, and copy should not return as primary UI.
+
+## Current Shape
+
+- `Sources/App`: app lifecycle and menu bar.
+- `Sources/Services`: player monitor, queue, ListenBrainz, proxy, vault, and transitional scrobble coordination.
+- `Sources/UI`: SwiftUI app shell and settings.
+- `Sources/Domain`: shared domain models.
+- `Tests`: inherited tests to keep behavior stable during the migration.
+
+## Reference Strategy
+
+Implementation work should stay aligned with the open ecosystem instead of inventing private semantics. See:
+
+- `docs/OPEN_ECOSYSTEM_REFERENCES.md`
+- `docs/LISTENBRAINZ_INTEGRATION.md`
+- `ROADMAP.md`

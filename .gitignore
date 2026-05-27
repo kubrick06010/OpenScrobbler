@@ -1,0 +1,18 @@
+.DS_Store
+
+# Local reference checkouts used while studying the open ecosystem.
+.references/
+
+# Xcode local state and build products.
+DerivedData/
+build/
+dist/
+*.xcresult
+*.moved-aside
+*.xcuserstate
+xcuserdata/
+
+# SwiftPM and editor noise.
+.build/
+.swiftpm/
+.vscode/

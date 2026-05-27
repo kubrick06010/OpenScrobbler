@@ -1,0 +1,590 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		00D3FD32365C01B978F260A8 /* similarity-openapi.json in Resources */ = {isa = PBXBuildFile; fileRef = 4D32A9E4FE0697AEA70D0FA5 /* similarity-openapi.json */; };
+		090D7CD25F5394BFF3DE1E50 /* ScrobbleQueueStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9B4BEF0A1C8F7B573372444 /* ScrobbleQueueStore.swift */; };
+		0DDD21A5A50E5DC9DB7D21CC /* MoodPaletteEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA73E2EE23E95E82C345B34A /* MoodPaletteEngine.swift */; };
+		1BD25D57864122BC3EF0EE50 /* artist-map-openapi.json in Resources */ = {isa = PBXBuildFile; fileRef = DF283F9CB9E9060C8AF52F12 /* artist-map-openapi.json */; };
+		23A1F613093CC01A56328D9D /* VaultStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFCCF9DA53FAE2B7CEB06032 /* VaultStoreTests.swift */; };
+		31C4043BC352F08C41EBA901 /* CompatibilityAPIErrorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 948CD321C9C69762A3F9ED43 /* CompatibilityAPIErrorTests.swift */; };
+		397AB45ED758ECF7279FA88A /* VaultModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = BADAFD64BAE67C5E40286378 /* VaultModels.swift */; };
+		44588E84C071620CD2820D90 /* ProxySettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76F743410C80AF526D938086 /* ProxySettings.swift */; };
+		531A280A7D18F30D971001BE /* similar-users-openapi.json in Resources */ = {isa = PBXBuildFile; fileRef = 04191CCBC6AF468AF05E706D /* similar-users-openapi.json */; };
+		55D717566443C29852C5CF15 /* ListenBrainzServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0D17CC6E6769732AF5ADC9E /* ListenBrainzServiceTests.swift */; };
+		6A70A3ECE792D75D923FCB6B /* LaunchAtLoginController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67BC865FE8E7F5EB6B82A7B0 /* LaunchAtLoginController.swift */; };
+		6E3253BBE32191CB49DDC0ED /* PlayerNormalizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F380BBAA04419C228B7FAEF /* PlayerNormalizationTests.swift */; };
+		75271B21A49D115820DFBED8 /* PlayerMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56E766D6FC8095B2F1117475 /* PlayerMonitor.swift */; };
+		773A8148202AD1A9467933FF /* PlayerNormalization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49BDBC2FFA16433B45BA42F3 /* PlayerNormalization.swift */; };
+		87E6523C71C372F7804F86EB /* CompatibilityAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2548A98187D5CCC43BF807A /* CompatibilityAPI.swift */; };
+		9B51A2F83603ADCC4F7B5EAC /* playlist-jspf-openapi.json in Resources */ = {isa = PBXBuildFile; fileRef = 778C00B3D84867BF5158E4E4 /* playlist-jspf-openapi.json */; };
+		A087CA18923A9C906A80D932 /* NowPlayingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 751A93F1F2B3A4A9D7B86D65 /* NowPlayingView.swift */; };
+		A318D5E6B832D430C28D8967 /* MusicBrainzService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD6E57E3CA79357ECEF8E7EB /* MusicBrainzService.swift */; };
+		A4DF6EF58DD0A738C5DB38E7 /* ScrobbleQueueStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FABE65A8448C31172B8EA3B /* ScrobbleQueueStoreTests.swift */; };
+		A6908840937FD5747C075574 /* Track.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E88C84B72BF5CDE99DBB325 /* Track.swift */; };
+		AC1773D6AAB69BC52D25BF8A /* CompatibilityAccountsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2574D9E50249550852772B8 /* CompatibilityAccountsStore.swift */; };
+		B240A3747EACFD7F541BE352 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5254D9C6FEAA307DB10BD0F /* SettingsView.swift */; };
+		C900073D59724A9F4DA91ACE /* ScrobbleService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E335A68FF6DDF27B07BAFE57 /* ScrobbleService.swift */; };
+		D96BD3D42D5A1AF6E918CED2 /* VaultStores.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44B0B472317B40CCD067BB5D /* VaultStores.swift */; };
+		E0E3A81BA853135C40FA1815 /* MusicBrainzServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 283B8DD77EC3F6CD9311B24A /* MusicBrainzServiceTests.swift */; };
+		E0E59F88C055F7A7B5493508 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64522A5F740C6E1BDFF8DDB9 /* ContentView.swift */; };
+		E5C7506C622902681933338B /* CompatibilitySignatureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15A95E641685904D84AA7497 /* CompatibilitySignatureTests.swift */; };
+		EC963B537EA83EE6E4E08CE2 /* ListenBrainzService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3454FC6E9EC86078F7179BDF /* ListenBrainzService.swift */; };
+		F33C7C053E803C5017457790 /* ScrobbleServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14D2423BD080FC9AD2BB6512 /* ScrobbleServiceTests.swift */; };
+		FA72E3FFCB98A75F767AE215 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8EF926F1CC88201E7F8BBFCC /* Assets.xcassets */; };
+		FC7B52AB29F670F4327BAD09 /* OpenScrobblerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDE0AEEF6ABC15940E86B434 /* OpenScrobblerApp.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		7585B0AEF1C95A5F737E8A31 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 32BA788BC896BECD873610EA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C95E0AFDA537111F309AD3E5;
+			remoteInfo = OpenScrobbler;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		04191CCBC6AF468AF05E706D /* similar-users-openapi.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "similar-users-openapi.json"; sourceTree = "<group>"; };
+		0F380BBAA04419C228B7FAEF /* PlayerNormalizationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerNormalizationTests.swift; sourceTree = "<group>"; };
+		14D2423BD080FC9AD2BB6512 /* ScrobbleServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrobbleServiceTests.swift; sourceTree = "<group>"; };
+		15A95E641685904D84AA7497 /* CompatibilitySignatureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompatibilitySignatureTests.swift; sourceTree = "<group>"; };
+		283B8DD77EC3F6CD9311B24A /* MusicBrainzServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicBrainzServiceTests.swift; sourceTree = "<group>"; };
+		3454FC6E9EC86078F7179BDF /* ListenBrainzService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListenBrainzService.swift; sourceTree = "<group>"; };
+		3FABE65A8448C31172B8EA3B /* ScrobbleQueueStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrobbleQueueStoreTests.swift; sourceTree = "<group>"; };
+		44B0B472317B40CCD067BB5D /* VaultStores.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultStores.swift; sourceTree = "<group>"; };
+		49BDBC2FFA16433B45BA42F3 /* PlayerNormalization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerNormalization.swift; sourceTree = "<group>"; };
+		4D32A9E4FE0697AEA70D0FA5 /* similarity-openapi.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "similarity-openapi.json"; sourceTree = "<group>"; };
+		56E766D6FC8095B2F1117475 /* PlayerMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerMonitor.swift; sourceTree = "<group>"; };
+		64522A5F740C6E1BDFF8DDB9 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		67BC865FE8E7F5EB6B82A7B0 /* LaunchAtLoginController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLoginController.swift; sourceTree = "<group>"; };
+		751A93F1F2B3A4A9D7B86D65 /* NowPlayingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlayingView.swift; sourceTree = "<group>"; };
+		76F743410C80AF526D938086 /* ProxySettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxySettings.swift; sourceTree = "<group>"; };
+		778C00B3D84867BF5158E4E4 /* playlist-jspf-openapi.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "playlist-jspf-openapi.json"; sourceTree = "<group>"; };
+		8E88C84B72BF5CDE99DBB325 /* Track.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Track.swift; sourceTree = "<group>"; };
+		8EF926F1CC88201E7F8BBFCC /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		948CD321C9C69762A3F9ED43 /* CompatibilityAPIErrorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompatibilityAPIErrorTests.swift; sourceTree = "<group>"; };
+		A0D17CC6E6769732AF5ADC9E /* ListenBrainzServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListenBrainzServiceTests.swift; sourceTree = "<group>"; };
+		AA73E2EE23E95E82C345B34A /* MoodPaletteEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoodPaletteEngine.swift; sourceTree = "<group>"; };
+		BADAFD64BAE67C5E40286378 /* VaultModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultModels.swift; sourceTree = "<group>"; };
+		BDE0AEEF6ABC15940E86B434 /* OpenScrobblerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenScrobblerApp.swift; sourceTree = "<group>"; };
+		C2548A98187D5CCC43BF807A /* CompatibilityAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompatibilityAPI.swift; sourceTree = "<group>"; };
+		DF283F9CB9E9060C8AF52F12 /* artist-map-openapi.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "artist-map-openapi.json"; sourceTree = "<group>"; };
+		E1D920C82E39DB24395597CE /* OpenScrobbler.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OpenScrobbler.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E2574D9E50249550852772B8 /* CompatibilityAccountsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompatibilityAccountsStore.swift; sourceTree = "<group>"; };
+		E335A68FF6DDF27B07BAFE57 /* ScrobbleService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrobbleService.swift; sourceTree = "<group>"; };
+		E43B4D6B5C4C8C315CE903C5 /* OpenScrobblerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OpenScrobblerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		E9B4BEF0A1C8F7B573372444 /* ScrobbleQueueStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrobbleQueueStore.swift; sourceTree = "<group>"; };
+		F5254D9C6FEAA307DB10BD0F /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		FD6E57E3CA79357ECEF8E7EB /* MusicBrainzService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicBrainzService.swift; sourceTree = "<group>"; };
+		FFCCF9DA53FAE2B7CEB06032 /* VaultStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultStoreTests.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		0DF6E8CF31D32C6793A8203C /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				E34CF0B31C574CC770666E7F /* App */,
+				E1C42B1FF24CB2B867FE375E /* Domain */,
+				248BD2C2A27AB5360C783AAC /* Services */,
+				C3406F3F72D625C6AB064081 /* UI */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		248BD2C2A27AB5360C783AAC /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				E2574D9E50249550852772B8 /* CompatibilityAccountsStore.swift */,
+				C2548A98187D5CCC43BF807A /* CompatibilityAPI.swift */,
+				67BC865FE8E7F5EB6B82A7B0 /* LaunchAtLoginController.swift */,
+				3454FC6E9EC86078F7179BDF /* ListenBrainzService.swift */,
+				AA73E2EE23E95E82C345B34A /* MoodPaletteEngine.swift */,
+				FD6E57E3CA79357ECEF8E7EB /* MusicBrainzService.swift */,
+				56E766D6FC8095B2F1117475 /* PlayerMonitor.swift */,
+				49BDBC2FFA16433B45BA42F3 /* PlayerNormalization.swift */,
+				76F743410C80AF526D938086 /* ProxySettings.swift */,
+				E9B4BEF0A1C8F7B573372444 /* ScrobbleQueueStore.swift */,
+				E335A68FF6DDF27B07BAFE57 /* ScrobbleService.swift */,
+				44B0B472317B40CCD067BB5D /* VaultStores.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		4CB26A48D93DC6B2E8CCC9DA /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				E1D920C82E39DB24395597CE /* OpenScrobbler.app */,
+				E43B4D6B5C4C8C315CE903C5 /* OpenScrobblerTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		5D10030F1C8AB3EDDF56F8AC /* Fixtures */ = {
+			isa = PBXGroup;
+			children = (
+				865359F9AF70037100B8BF3F /* ListenBrainz */,
+			);
+			path = Fixtures;
+			sourceTree = "<group>";
+		};
+		865359F9AF70037100B8BF3F /* ListenBrainz */ = {
+			isa = PBXGroup;
+			children = (
+				DF283F9CB9E9060C8AF52F12 /* artist-map-openapi.json */,
+				778C00B3D84867BF5158E4E4 /* playlist-jspf-openapi.json */,
+				04191CCBC6AF468AF05E706D /* similar-users-openapi.json */,
+				4D32A9E4FE0697AEA70D0FA5 /* similarity-openapi.json */,
+			);
+			path = ListenBrainz;
+			sourceTree = "<group>";
+		};
+		930532EC3D1263415874FF49 = {
+			isa = PBXGroup;
+			children = (
+				CFBF4B9F9AF8BBE45666E10F /* Resources */,
+				0DF6E8CF31D32C6793A8203C /* Sources */,
+				D53AFF0B0778DC55D6814831 /* Tests */,
+				4CB26A48D93DC6B2E8CCC9DA /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		C3406F3F72D625C6AB064081 /* UI */ = {
+			isa = PBXGroup;
+			children = (
+				64522A5F740C6E1BDFF8DDB9 /* ContentView.swift */,
+				751A93F1F2B3A4A9D7B86D65 /* NowPlayingView.swift */,
+				F5254D9C6FEAA307DB10BD0F /* SettingsView.swift */,
+			);
+			path = UI;
+			sourceTree = "<group>";
+		};
+		CFBF4B9F9AF8BBE45666E10F /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				8EF926F1CC88201E7F8BBFCC /* Assets.xcassets */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		D53AFF0B0778DC55D6814831 /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				948CD321C9C69762A3F9ED43 /* CompatibilityAPIErrorTests.swift */,
+				15A95E641685904D84AA7497 /* CompatibilitySignatureTests.swift */,
+				A0D17CC6E6769732AF5ADC9E /* ListenBrainzServiceTests.swift */,
+				283B8DD77EC3F6CD9311B24A /* MusicBrainzServiceTests.swift */,
+				0F380BBAA04419C228B7FAEF /* PlayerNormalizationTests.swift */,
+				3FABE65A8448C31172B8EA3B /* ScrobbleQueueStoreTests.swift */,
+				14D2423BD080FC9AD2BB6512 /* ScrobbleServiceTests.swift */,
+				FFCCF9DA53FAE2B7CEB06032 /* VaultStoreTests.swift */,
+				5D10030F1C8AB3EDDF56F8AC /* Fixtures */,
+			);
+			path = Tests;
+			sourceTree = "<group>";
+		};
+		E1C42B1FF24CB2B867FE375E /* Domain */ = {
+			isa = PBXGroup;
+			children = (
+				8E88C84B72BF5CDE99DBB325 /* Track.swift */,
+				BADAFD64BAE67C5E40286378 /* VaultModels.swift */,
+			);
+			path = Domain;
+			sourceTree = "<group>";
+		};
+		E34CF0B31C574CC770666E7F /* App */ = {
+			isa = PBXGroup;
+			children = (
+				BDE0AEEF6ABC15940E86B434 /* OpenScrobblerApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		C95E0AFDA537111F309AD3E5 /* OpenScrobbler */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C767BC001A4753E36C086966 /* Build configuration list for PBXNativeTarget "OpenScrobbler" */;
+			buildPhases = (
+				9EF3D0B0361B8693CFCA575B /* Sources */,
+				4D3636204C3A803EEB9BF0D6 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = OpenScrobbler;
+			packageProductDependencies = (
+			);
+			productName = OpenScrobbler;
+			productReference = E1D920C82E39DB24395597CE /* OpenScrobbler.app */;
+			productType = "com.apple.product-type.application";
+		};
+		F15E975845D41F287D81AE0E /* OpenScrobblerTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3BC6A4BA430607CC9A368EFE /* Build configuration list for PBXNativeTarget "OpenScrobblerTests" */;
+			buildPhases = (
+				D35CE148B55969D3A6D93770 /* Sources */,
+				4B8B41BB3FDE04C57B126E03 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				FA30C6B52FF29367323EBDCE /* PBXTargetDependency */,
+			);
+			name = OpenScrobblerTests;
+			packageProductDependencies = (
+			);
+			productName = OpenScrobblerTests;
+			productReference = E43B4D6B5C4C8C315CE903C5 /* OpenScrobblerTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		32BA788BC896BECD873610EA /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+				};
+			};
+			buildConfigurationList = F3F1199166E874D34969D2FC /* Build configuration list for PBXProject "OpenScrobbler" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 930532EC3D1263415874FF49;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 4CB26A48D93DC6B2E8CCC9DA /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				C95E0AFDA537111F309AD3E5 /* OpenScrobbler */,
+				F15E975845D41F287D81AE0E /* OpenScrobblerTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		4B8B41BB3FDE04C57B126E03 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1BD25D57864122BC3EF0EE50 /* artist-map-openapi.json in Resources */,
+				9B51A2F83603ADCC4F7B5EAC /* playlist-jspf-openapi.json in Resources */,
+				531A280A7D18F30D971001BE /* similar-users-openapi.json in Resources */,
+				00D3FD32365C01B978F260A8 /* similarity-openapi.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4D3636204C3A803EEB9BF0D6 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FA72E3FFCB98A75F767AE215 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		9EF3D0B0361B8693CFCA575B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				87E6523C71C372F7804F86EB /* CompatibilityAPI.swift in Sources */,
+				AC1773D6AAB69BC52D25BF8A /* CompatibilityAccountsStore.swift in Sources */,
+				E0E59F88C055F7A7B5493508 /* ContentView.swift in Sources */,
+				6A70A3ECE792D75D923FCB6B /* LaunchAtLoginController.swift in Sources */,
+				EC963B537EA83EE6E4E08CE2 /* ListenBrainzService.swift in Sources */,
+				0DDD21A5A50E5DC9DB7D21CC /* MoodPaletteEngine.swift in Sources */,
+				A318D5E6B832D430C28D8967 /* MusicBrainzService.swift in Sources */,
+				A087CA18923A9C906A80D932 /* NowPlayingView.swift in Sources */,
+				FC7B52AB29F670F4327BAD09 /* OpenScrobblerApp.swift in Sources */,
+				75271B21A49D115820DFBED8 /* PlayerMonitor.swift in Sources */,
+				773A8148202AD1A9467933FF /* PlayerNormalization.swift in Sources */,
+				44588E84C071620CD2820D90 /* ProxySettings.swift in Sources */,
+				090D7CD25F5394BFF3DE1E50 /* ScrobbleQueueStore.swift in Sources */,
+				C900073D59724A9F4DA91ACE /* ScrobbleService.swift in Sources */,
+				B240A3747EACFD7F541BE352 /* SettingsView.swift in Sources */,
+				A6908840937FD5747C075574 /* Track.swift in Sources */,
+				397AB45ED758ECF7279FA88A /* VaultModels.swift in Sources */,
+				D96BD3D42D5A1AF6E918CED2 /* VaultStores.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D35CE148B55969D3A6D93770 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				31C4043BC352F08C41EBA901 /* CompatibilityAPIErrorTests.swift in Sources */,
+				E5C7506C622902681933338B /* CompatibilitySignatureTests.swift in Sources */,
+				55D717566443C29852C5CF15 /* ListenBrainzServiceTests.swift in Sources */,
+				E0E3A81BA853135C40FA1815 /* MusicBrainzServiceTests.swift in Sources */,
+				6E3253BBE32191CB49DDC0ED /* PlayerNormalizationTests.swift in Sources */,
+				A4DF6EF58DD0A738C5DB38E7 /* ScrobbleQueueStoreTests.swift in Sources */,
+				F33C7C053E803C5017457790 /* ScrobbleServiceTests.swift in Sources */,
+				23A1F613093CC01A56328D9D /* VaultStoreTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		FA30C6B52FF29367323EBDCE /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C95E0AFDA537111F309AD3E5 /* OpenScrobbler */;
+			targetProxy = 7585B0AEF1C95A5F737E8A31 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		069E8C228DEFDF771235A156 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = org.openscrobbler.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		45410C1E8434BBA961DB8B20 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				COMBINE_HIDPI_IMAGES = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = OpenScrobbler;
+				INFOPLIST_KEY_CFBundleIconFile = AppIcon.icns;
+				INFOPLIST_KEY_CFBundleName = OpenScrobbler;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright (c) 2026";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_MODULE_NAME = OpenScrobbler;
+				PRODUCT_NAME = OpenScrobbler;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		CADA3704F83CA861C05810BC /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_BUNDLE_IDENTIFIER = org.openscrobbler.app.tests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/OpenScrobbler.app/Contents/MacOS/OpenScrobbler";
+			};
+			name = Debug;
+		};
+		F3347C7FD3A8DA2EBE3F14CF /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				COMBINE_HIDPI_IMAGES = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = OpenScrobbler;
+				INFOPLIST_KEY_CFBundleIconFile = AppIcon.icns;
+				INFOPLIST_KEY_CFBundleName = OpenScrobbler;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright (c) 2026";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_MODULE_NAME = OpenScrobbler;
+				PRODUCT_NAME = OpenScrobbler;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		FAB7E1D2E6F7352AD442C3F2 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_BUNDLE_IDENTIFIER = org.openscrobbler.app.tests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/OpenScrobbler.app/Contents/MacOS/OpenScrobbler";
+			};
+			name = Release;
+		};
+		FF8FD62CDD63EF2265AE68EF /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = org.openscrobbler.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		3BC6A4BA430607CC9A368EFE /* Build configuration list for PBXNativeTarget "OpenScrobblerTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CADA3704F83CA861C05810BC /* Debug */,
+				FAB7E1D2E6F7352AD442C3F2 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		C767BC001A4753E36C086966 /* Build configuration list for PBXNativeTarget "OpenScrobbler" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F3347C7FD3A8DA2EBE3F14CF /* Debug */,
+				45410C1E8434BBA961DB8B20 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		F3F1199166E874D34969D2FC /* Build configuration list for PBXProject "OpenScrobbler" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				069E8C228DEFDF771235A156 /* Debug */,
+				FF8FD62CDD63EF2265AE68EF /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 32BA788BC896BECD873610EA /* Project object */;
+}

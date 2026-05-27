@@ -1,0 +1,208 @@
+# ListenBrainz Integration
+
+This document defines how `OpenScrobbler` integrates with ListenBrainz today and where that integration should go next.
+
+The product position is simple:
+
+- ListenBrainz is the primary account and archive backend.
+- MusicBrainz identifiers are the preferred metadata spine.
+- Local-first storage, exports, and memory features remain a core differentiator.
+- Legacy provider-era code may still exist during migration, but it is not a product goal and should not shape new UX or architecture.
+
+## Official References
+
+Primary references:
+
+- ListenBrainz docs: `https://listenbrainz.readthedocs.io/`
+- API index: `https://listenbrainz.readthedocs.io/en/latest/users/api/index.html`
+- JSON submission docs: `https://listenbrainz.readthedocs.io/en/latest/users/json.html`
+- API usage examples: `https://listenbrainz.readthedocs.io/en/latest/users/api-usage.html`
+- Statistics API: `https://listenbrainz.readthedocs.io/en/latest/users/api/statistics.html`
+- Core API: `https://listenbrainz.readthedocs.io/en/latest/users/api/core.html`
+
+## Product Scope
+
+ListenBrainz in `OpenScrobbler` should cover:
+
+- token-based account setup
+- `playing_now` and completed listen submission
+- durable queueing and per-backend diagnostics where applicable
+- recent listens and archive charts
+- followers and following
+- similar users and compatibility
+- recommendations
+- pins
+- playlists
+- artist geography
+- radio and affinity-based discovery
+- metadata enrichment hooks that preserve MBIDs wherever possible
+
+## Current State
+
+Already present in the app:
+
+- app-owned local token storage under Application Support
+- token validation and username resolution
+- native JSON submission for `playing_now` and completed listens
+- recent listens, top artists, top releases, top recordings, and total listen counts
+- followers, following, and recommendation flows
+- playlist and pin support
+- artist origins and artist affinity graph experiments
+- deterministic tests for the core ListenBrainz flows already implemented
+
+Still incomplete:
+
+- compatibility view and overlap UX for comparing users
+- richer retry and rate-limit handling in the client core
+- OpenAPI-aligned fixtures for broader payload coverage
+- MusicBrainz enrichment and metadata quality surfacing
+- JSPF import/export and local resolution workflows
+
+## Account Model
+
+ListenBrainz settings should remain centered on:
+
+- enablement
+- token entry
+- validation status
+- resolved username
+- optional custom base URL for compatible deployments
+- toggles for `playing_now` and completed listens when needed
+
+The token is stored in `~/Library/Application Support/OpenScrobbler/Secrets/listenbrainz-token` with user-only file permissions. This avoids repeated macOS Keychain prompts during local development builds. Non-sensitive state such as "token present" is cached separately to keep launch and test flows quiet.
+
+## Submission Model
+
+### `playing_now`
+
+Payload shape:
+
+```json
+{
+  "listen_type": "playing_now",
+  "payload": [
+    {
+      "track_metadata": {
+        "artist_name": "Portishead",
+        "track_name": "The Rip",
+        "release_name": "Third"
+      }
+    }
+  ]
+}
+```
+
+### completed listen
+
+Payload shape:
+
+```json
+{
+  "listen_type": "single",
+  "payload": [
+    {
+      "listened_at": 1779164400,
+      "track_metadata": {
+        "artist_name": "Portishead",
+        "track_name": "The Rip",
+        "release_name": "Third",
+        "additional_info": {
+          "media_player": "OpenScrobbler",
+          "submission_client": "OpenScrobbler",
+          "submission_client_version": "0.1.0"
+        }
+      }
+    }
+  ]
+}
+```
+
+Mapping from app `Track`:
+
+- `track.title` -> `track_name`
+- `track.artist` -> `artist_name`
+- `track.album` -> `release_name`
+- scrobble completion time -> `listened_at`
+- `track.sourceApp` -> `additional_info.media_player` when useful
+
+## Service Architecture
+
+`ListenBrainzService` should continue evolving toward a small reusable request core:
+
+- shared request building
+- token injection
+- spec-aligned decoding
+- 429-aware retry and backoff
+- consistent HTTP and transport error mapping
+- generic fallback methods for unsupported endpoints
+
+This keeps the service maintainable as we add more endpoints from the ListenBrainz ecosystem.
+
+## Archive Surfaces
+
+The archive layer should treat ListenBrainz as the main source for:
+
+- recent listens
+- top artists, releases, and recordings
+- total listen counts
+- artist map
+- user-to-user compatibility
+- similar users
+- radio-derived affinity exploration
+
+Where possible, archive entities should preserve MBIDs so later MusicBrainz enrichment and local-resolution features become easier.
+
+## Social And Discovery
+
+The main open-social surface should be built around:
+
+- followers
+- following
+- similar users
+- compatibility score
+- artists in common
+- recommendation sharing
+- pinned recordings
+- playlists and recommendation playlists
+
+Important note:
+
+- compatibility should come from ListenBrainz `similar-to`
+- "artists in common" is a useful app-level derivation and can be computed by intersecting top artists for both users
+
+## Playlist And Local Ownership Direction
+
+ListenBrainz playlists should not remain an isolated cloud feature inside the app.
+
+The medium-term direction is:
+
+- export playlist-like content as JSPF-compatible artifacts
+- import public ListenBrainz playlists for local use
+- track unresolved MBIDs when local files cannot be matched
+- evolve `Shared` and `Obsessions` toward open, MusicBrainz-aware artifacts
+
+This aligns `OpenScrobbler` with the broader open ecosystem rather than creating a private side format.
+
+## Testing Requirements
+
+The ListenBrainz test suite should cover:
+
+- token validation
+- missing token behavior
+- invalid token behavior
+- request decoding for charts, social, playlists, pins, artist map, and radio
+- compatibility and similar users payloads
+- partial and sparse payloads
+- custom base URL behavior
+- retry and error mapping behavior once the request core is refactored
+- token-store isolation and quiet startup behavior
+
+Fixtures should prefer payloads cross-checked against the ListenBrainz OpenAPI spec.
+
+## Next Steps
+
+1. Add compatibility UI and "artists in common" to `Social`.
+2. Refactor `ListenBrainzService` around a shared request pipeline with retry/backoff.
+3. Broaden OpenAPI-aligned fixtures and tests.
+4. Add JSPF export/import groundwork.
+5. Add MusicBrainz enrichment and provenance surfacing.

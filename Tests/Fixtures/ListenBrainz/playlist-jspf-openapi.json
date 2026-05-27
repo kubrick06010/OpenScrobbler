@@ -1,0 +1,30 @@
+{
+  "playlist": {
+    "title": "Open Archive Mix",
+    "creator": "tester",
+    "annotation": "Portable recommendations",
+    "identifier": "https://listenbrainz.org/playlist/pl-1",
+    "date": "2026-05-21T12:00:00Z",
+    "track": [
+      {
+        "identifier": "https://musicbrainz.org/recording/mbid-1",
+        "title": "Track One",
+        "creator": "Artist One",
+        "album": "Album One",
+        "annotation": "Shared from the archive",
+        "extension": {
+          "https://musicbrainz.org/doc/jspf#track": {
+            "artist_mbid": "artist-mbid-1",
+            "recording_mbid": "mbid-1",
+            "release_mbid": "release-mbid-1"
+          }
+        }
+      }
+    ],
+    "extension": {
+      "https://musicbrainz.org/doc/jspf#playlist": {
+        "public": true
+      }
+    }
+  }
+}

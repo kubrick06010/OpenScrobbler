@@ -1,0 +1,247 @@
+import Foundation
+
+struct OpenMusicEntityDetails: Equatable {
+    struct Link: Identifiable, Equatable {
+        let id: String
+        let title: String
+        let url: URL
+    }
+
+    let trackName: String?
+    let artistName: String
+    let releaseName: String?
+    let recordingMBID: String?
+    let artistMBID: String?
+    let releaseMBID: String?
+    let disambiguation: String?
+    let country: String?
+    let type: String?
+    let tags: [String]
+    let links: [Link]
+
+    var hasResolvedMusicBrainzEntity: Bool {
+        recordingMBID != nil || artistMBID != nil || releaseMBID != nil
+    }
+}
+
+final class MusicBrainzService {
+    private let baseURL: URL
+    private let urlSession: URLSession
+
+    init(
+        baseURL: URL = URL(string: "https://musicbrainz.org/ws/2")!,
+        urlSession: URLSession = .shared
+    ) {
+        self.baseURL = baseURL
+        self.urlSession = urlSession
+    }
+
+    func lookup(track: String?, artist: String, release: String?) async throws -> OpenMusicEntityDetails {
+        async let recording = track.flatMap { title in
+            Task { try await searchRecording(title: title, artist: artist, release: release) }
+        }?.value
+        async let artistMatch = searchArtist(name: artist)
+        async let releaseMatch = release.flatMap { releaseName in
+            Task { try await searchRelease(title: releaseName, artist: artist) }
+        }?.value
+
+        let resolvedRecording = try await recording
+        let resolvedArtist = try await artistMatch
+        let resolvedRelease = try await releaseMatch
+
+        let recordingMBID = resolvedRecording?.id
+        let artistMBID = resolvedRecording?.artistCredit?.first?.artist.id ?? resolvedArtist?.id
+        let releaseMBID = resolvedRecording?.releases?.first?.id ?? resolvedRelease?.id
+        let resolvedReleaseName = release?.nilIfBlank ?? resolvedRecording?.releases?.first?.title ?? resolvedRelease?.title
+        let tags = ((resolvedRecording?.tags ?? []) + (resolvedArtist?.tags ?? []) + (resolvedRelease?.tags ?? []))
+            .sorted { $0.count > $1.count }
+            .map(\.name)
+            .uniqued()
+
+        return OpenMusicEntityDetails(
+            trackName: track?.nilIfBlank ?? resolvedRecording?.title,
+            artistName: resolvedArtist?.name ?? resolvedRecording?.artistCredit?.first?.artist.name ?? artist,
+            releaseName: resolvedReleaseName,
+            recordingMBID: recordingMBID,
+            artistMBID: artistMBID,
+            releaseMBID: releaseMBID,
+            disambiguation: resolvedRecording?.disambiguation?.nilIfBlank ?? resolvedArtist?.disambiguation?.nilIfBlank,
+            country: resolvedArtist?.country?.nilIfBlank,
+            type: resolvedArtist?.type?.nilIfBlank ?? resolvedRelease?.status?.nilIfBlank,
+            tags: Array(tags.prefix(12)),
+            links: links(recordingMBID: recordingMBID, artistMBID: artistMBID, releaseMBID: releaseMBID)
+        )
+    }
+
+    private func searchRecording(title: String, artist: String, release: String?) async throws -> MusicBrainzRecording? {
+        var terms = [
+            "recording:\(quoted(title))",
+            "artist:\(quoted(artist))"
+        ]
+        if let release = release?.nilIfBlank {
+            terms.append("release:\(quoted(release))")
+        }
+        let response: RecordingSearchResponse = try await search(
+            entity: "recording",
+            query: terms.joined(separator: " AND "),
+            includes: "artist-credits+releases+tags"
+        )
+        return response.recordings.first
+    }
+
+    private func searchArtist(name: String) async throws -> MusicBrainzArtist? {
+        let response: ArtistSearchResponse = try await search(
+            entity: "artist",
+            query: "artist:\(quoted(name))",
+            includes: "tags"
+        )
+        return response.artists.first
+    }
+
+    private func searchRelease(title: String, artist: String) async throws -> MusicBrainzRelease? {
+        let response: ReleaseSearchResponse = try await search(
+            entity: "release",
+            query: "release:\(quoted(title)) AND artist:\(quoted(artist))",
+            includes: "artist-credits+tags"
+        )
+        return response.releases.first
+    }
+
+    private func search<T: Decodable>(entity: String, query: String, includes: String) async throws -> T {
+        var components = URLComponents(
+            url: baseURL.appendingPathComponent(entity),
+            resolvingAgainstBaseURL: false
+        )
+        components?.queryItems = [
+            URLQueryItem(name: "query", value: query),
+            URLQueryItem(name: "fmt", value: "json"),
+            URLQueryItem(name: "limit", value: "1"),
+            URLQueryItem(name: "inc", value: includes)
+        ]
+        guard let url = components?.url else { throw MusicBrainzError.invalidResponse }
+
+        var request = URLRequest(url: url)
+        request.setValue("OpenScrobbler/0.1.0 ( https://github.com/openscrobbler )", forHTTPHeaderField: "User-Agent")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        let (data, response) = try await urlSession.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw MusicBrainzError.invalidResponse
+        }
+        guard (200..<300).contains(http.statusCode) else {
+            throw MusicBrainzError.api(message: "MusicBrainz returned HTTP \(http.statusCode).")
+        }
+        return try JSONDecoder().decode(T.self, from: data)
+    }
+
+    private func quoted(_ value: String) -> String {
+        "\"\(value.replacingOccurrences(of: "\"", with: ""))\""
+    }
+
+    private func links(recordingMBID: String?, artistMBID: String?, releaseMBID: String?) -> [OpenMusicEntityDetails.Link] {
+        var output: [OpenMusicEntityDetails.Link] = []
+        if let recordingMBID {
+            output.append(.init(
+                id: "recording-\(recordingMBID)",
+                title: "MusicBrainz Recording",
+                url: URL(string: "https://musicbrainz.org/recording/\(recordingMBID)")!
+            ))
+            output.append(.init(
+                id: "listenbrainz-\(recordingMBID)",
+                title: "ListenBrainz Recording",
+                url: URL(string: "https://listenbrainz.org/player/?recording_mbids=\(recordingMBID)")!
+            ))
+        }
+        if let artistMBID {
+            output.append(.init(
+                id: "artist-\(artistMBID)",
+                title: "MusicBrainz Artist",
+                url: URL(string: "https://musicbrainz.org/artist/\(artistMBID)")!
+            ))
+        }
+        if let releaseMBID {
+            output.append(.init(
+                id: "release-\(releaseMBID)",
+                title: "MusicBrainz Release",
+                url: URL(string: "https://musicbrainz.org/release/\(releaseMBID)")!
+            ))
+        }
+        return output
+    }
+}
+
+enum MusicBrainzError: LocalizedError, Equatable {
+    case invalidResponse
+    case api(message: String)
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidResponse:
+            return "Unexpected response from MusicBrainz."
+        case let .api(message):
+            return message
+        }
+    }
+}
+
+private struct RecordingSearchResponse: Decodable {
+    let recordings: [MusicBrainzRecording]
+}
+
+private struct ArtistSearchResponse: Decodable {
+    let artists: [MusicBrainzArtist]
+}
+
+private struct ReleaseSearchResponse: Decodable {
+    let releases: [MusicBrainzRelease]
+}
+
+private struct MusicBrainzRecording: Decodable {
+    let id: String
+    let title: String
+    let disambiguation: String?
+    let artistCredit: [MusicBrainzArtistCredit]?
+    let releases: [MusicBrainzRelease]?
+    let tags: [MusicBrainzTag]?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case title
+        case disambiguation
+        case artistCredit = "artist-credit"
+        case releases
+        case tags
+    }
+}
+
+private struct MusicBrainzArtistCredit: Decodable {
+    let artist: MusicBrainzArtist
+}
+
+private struct MusicBrainzArtist: Decodable {
+    let id: String
+    let name: String
+    let disambiguation: String?
+    let country: String?
+    let type: String?
+    let tags: [MusicBrainzTag]?
+}
+
+private struct MusicBrainzRelease: Decodable {
+    let id: String
+    let title: String
+    let status: String?
+    let tags: [MusicBrainzTag]?
+}
+
+private struct MusicBrainzTag: Decodable {
+    let count: Int
+    let name: String
+}
+
+private extension Array where Element == String {
+    func uniqued() -> [String] {
+        var seen = Set<String>()
+        return filter { seen.insert($0.lowercased()).inserted }
+    }
+}

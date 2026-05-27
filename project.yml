@@ -1,0 +1,59 @@
+name: OpenScrobbler
+options:
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: 5.0
+    CURRENT_PROJECT_VERSION: 1
+    MARKETING_VERSION: 0.1.0
+    GENERATE_INFOPLIST_FILE: YES
+    PRODUCT_BUNDLE_IDENTIFIER: org.openscrobbler.app
+
+targets:
+  OpenScrobbler:
+    type: application
+    platform: macOS
+    deploymentTarget: "13.0"
+    sources:
+      - path: Sources
+      - path: Resources
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_NAME: OpenScrobbler
+        PRODUCT_MODULE_NAME: OpenScrobbler
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        INFOPLIST_KEY_CFBundleIconFile: AppIcon.icns
+        INFOPLIST_KEY_CFBundleName: OpenScrobbler
+        INFOPLIST_KEY_CFBundleDisplayName: OpenScrobbler
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.music
+        INFOPLIST_KEY_NSHumanReadableCopyright: Copyright (c) 2026
+
+  OpenScrobblerTests:
+    type: bundle.unit-test
+    platform: macOS
+    deploymentTarget: "13.0"
+    sources:
+      - path: Tests
+        excludes:
+          - Fixtures
+      - path: Tests/Fixtures
+        buildPhase: resources
+    dependencies:
+      - target: OpenScrobbler
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: org.openscrobbler.app.tests
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/OpenScrobbler.app/Contents/MacOS/OpenScrobbler"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+
+schemes:
+  OpenScrobbler:
+    build:
+      targets:
+        OpenScrobbler: all
+        OpenScrobblerTests: [test]
+    test:
+      targets:
+        - OpenScrobblerTests
