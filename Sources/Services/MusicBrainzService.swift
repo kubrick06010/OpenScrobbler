@@ -63,7 +63,17 @@ final class MusicBrainzService {
         } else {
             imageURL = nil
         }
-        let tags = ((resolvedRecording?.tags ?? []) + (resolvedArtist?.tags ?? []) + (resolvedRelease?.tags ?? []))
+        var resolvedTags: [MusicBrainzTag] = []
+        if let recordingTags = resolvedRecording?.tags {
+            resolvedTags.append(contentsOf: recordingTags)
+        }
+        if let artistTags = resolvedArtist?.tags {
+            resolvedTags.append(contentsOf: artistTags)
+        }
+        if let releaseTags = resolvedRelease?.tags {
+            resolvedTags.append(contentsOf: releaseTags)
+        }
+        let tags = resolvedTags
             .sorted { $0.count > $1.count }
             .map(\.name)
             .uniqued()

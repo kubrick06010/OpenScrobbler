@@ -1050,24 +1050,35 @@ final class ListenBrainzService {
             let recording = entry["recording"] as? [String: Any]
             let artist = entry["artist"] as? [String: Any]
             let release = entry["release"] as? [String: Any]
-            let releaseName = (entry["release_name"] as? String)?.nilIfBlank
-                ?? (release?["release_name"] as? String)?.nilIfBlank
-                ?? (release?["name"] as? String)?.nilIfBlank
-                ?? ((entry["releases"] as? [[String: Any]])?.first?["release_name"] as? String)?.nilIfBlank
-                ?? ((entry["releases"] as? [[String: Any]])?.first?["name"] as? String)?.nilIfBlank
-            let recordingName = (entry["recording_name"] as? String)?.nilIfBlank
-                ?? (entry["track_name"] as? String)?.nilIfBlank
-                ?? (recording?["recording_name"] as? String)?.nilIfBlank
-                ?? (recording?["track_name"] as? String)?.nilIfBlank
-                ?? (recording?["name"] as? String)?.nilIfBlank
-                ?? (recording?["title"] as? String)?.nilIfBlank
-            let artistCreditName = (entry["artist_credit_name"] as? String)?.nilIfBlank
-                ?? (entry["artist_name"] as? String)?.nilIfBlank
-                ?? (artist?["artist_credit_name"] as? String)?.nilIfBlank
-                ?? (artist?["artist_name"] as? String)?.nilIfBlank
-                ?? (artist?["name"] as? String)?.nilIfBlank
-                ?? ((artist?["artists"] as? [[String: Any]])?.first?["name"] as? String)?.nilIfBlank
-                ?? (release?["album_artist_name"] as? String)?.nilIfBlank
+            let releaseList = entry["releases"] as? [[String: Any]]
+            let firstRelease = releaseList?.first
+            let artistList = artist?["artists"] as? [[String: Any]]
+            let firstArtist = artistList?.first
+
+            let releaseName = firstNonBlankString([
+                entry["release_name"] as? String,
+                release?["release_name"] as? String,
+                release?["name"] as? String,
+                firstRelease?["release_name"] as? String,
+                firstRelease?["name"] as? String
+            ])
+            let recordingName = firstNonBlankString([
+                entry["recording_name"] as? String,
+                entry["track_name"] as? String,
+                recording?["recording_name"] as? String,
+                recording?["track_name"] as? String,
+                recording?["name"] as? String,
+                recording?["title"] as? String
+            ])
+            let artistCreditName = firstNonBlankString([
+                entry["artist_credit_name"] as? String,
+                entry["artist_name"] as? String,
+                artist?["artist_credit_name"] as? String,
+                artist?["artist_name"] as? String,
+                artist?["name"] as? String,
+                firstArtist?["name"] as? String,
+                release?["album_artist_name"] as? String
+            ])
 
             output[mbid] = ListenBrainzRecordingMetadata(
                 recordingName: recordingName,
@@ -1076,6 +1087,15 @@ final class ListenBrainzService {
             )
         }
         return output
+    }
+
+    private func firstNonBlankString(_ values: [String?]) -> String? {
+        for value in values {
+            if let normalized = value?.nilIfBlank {
+                return normalized
+            }
+        }
+        return nil
     }
 
     private func fetchPlaylistSummaries(pathComponents: [String], count: Int) async throws -> [ListenBrainzPlaylistSummary] {
