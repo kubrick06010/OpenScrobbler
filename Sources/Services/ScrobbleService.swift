@@ -43,6 +43,45 @@ struct ArtistAffinityGraphSnapshot: Equatable {
     let generatedAt: Date
 }
 
+struct OpenListeningEnrichment: Equatable {
+    let userRecordingListenCount: Int?
+    let userArtistListenCount: Int?
+    let userReleaseListenCount: Int?
+    let globalRecordingListenCount: Int?
+    let globalRecordingListenerCount: Int?
+    let globalArtistListenCount: Int?
+    let globalArtistListenerCount: Int?
+    let globalReleaseListenCount: Int?
+    let globalReleaseListenerCount: Int?
+    let topArtistRecordings: [ListenBrainzPopularRecording]
+    let similarArtists: [ListenBrainzSimilarArtist]
+
+    static let empty = OpenListeningEnrichment(
+        userRecordingListenCount: nil,
+        userArtistListenCount: nil,
+        userReleaseListenCount: nil,
+        globalRecordingListenCount: nil,
+        globalRecordingListenerCount: nil,
+        globalArtistListenCount: nil,
+        globalArtistListenerCount: nil,
+        globalReleaseListenCount: nil,
+        globalReleaseListenerCount: nil,
+        topArtistRecordings: [],
+        similarArtists: []
+    )
+
+    var hasUsefulData: Bool {
+        userRecordingListenCount != nil ||
+            userArtistListenCount != nil ||
+            userReleaseListenCount != nil ||
+            globalRecordingListenCount != nil ||
+            globalArtistListenCount != nil ||
+            globalReleaseListenCount != nil ||
+            !topArtistRecordings.isEmpty ||
+            !similarArtists.isEmpty
+    }
+}
+
 @MainActor
 final class ScrobbleService: ObservableObject {
     @Published private(set) var currentTrack: Track?
@@ -108,9 +147,12 @@ final class ScrobbleService: ObservableObject {
     @Published private(set) var playerEventCount = 0
     @Published private(set) var currentTrackDetails: CompatibilityTrackDetails?
     @Published private(set) var currentArtistDetails: CompatibilityArtistDetails?
+    @Published private(set) var currentOpenEntityDetails: OpenMusicEntityDetails?
+    @Published private(set) var currentOpenEnrichment: OpenListeningEnrichment?
     @Published private(set) var inspectedTrackDetails: CompatibilityTrackDetails?
     @Published private(set) var inspectedArtistDetails: CompatibilityArtistDetails?
     @Published private(set) var inspectedOpenEntityDetails: OpenMusicEntityDetails?
+    @Published private(set) var inspectedOpenEnrichment: OpenListeningEnrichment?
     @Published private(set) var inspectedSimilarTracks: [CompatibilitySimilarTrack] = []
     @Published private(set) var inspectedSimilarAlbums: [CompatibilitySimilarAlbum] = []
     @Published private(set) var inspectStatus = "Select a listen to inspect"
@@ -161,6 +203,19 @@ final class ScrobbleService: ObservableObject {
     private let detailedSeparationDepth = 24
     private let retryJitter: () -> Double
     private let sleepFunction: @Sendable (UInt64) async -> Void
+
+    var accountFooterText: String {
+        if listenBrainzEnabled, let username = listenBrainzUsername?.nilIfBlank {
+            return "\(username) (ListenBrainz)"
+        }
+        if let name = profile?.name.nilIfBlank {
+            return "\(name) (\(isAuthenticated ? "Online" : "Offline"))"
+        }
+        if let username = sessionUsername?.nilIfBlank {
+            return "\(username) (\(isAuthenticated ? "Online" : "Offline"))"
+        }
+        return "Guest (Offline)"
+    }
 
     init(
         api: CompatibilityAPI? = nil,
@@ -934,6 +989,8 @@ final class ScrobbleService: ObservableObject {
             exploreStatus = "Waiting for track"
             currentTrackDetails = nil
             currentArtistDetails = nil
+            currentOpenEntityDetails = nil
+            currentOpenEnrichment = nil
             return
         }
         await refreshExploreData(for: track)
@@ -1042,6 +1099,7 @@ final class ScrobbleService: ObservableObject {
         inspectedTrackDetails = nil
         inspectedArtistDetails = nil
         inspectedOpenEntityDetails = nil
+        inspectedOpenEnrichment = nil
         inspectedSimilarTracks = []
         inspectedSimilarAlbums = []
 
@@ -1056,6 +1114,14 @@ final class ScrobbleService: ObservableObject {
                 artist: scrobble.artist,
                 release: isAlbumInspection ? (scrobble.album ?? scrobble.track) : scrobble.album
             )
+            if let inspectedOpenEntityDetails {
+                inspectedOpenEnrichment = await loadOpenEnrichment(
+                    details: inspectedOpenEntityDetails,
+                    track: (!isArtistOnlyInspection && !isAlbumInspection) ? scrobble.track : nil,
+                    artist: scrobble.artist,
+                    release: isAlbumInspection ? (scrobble.album ?? scrobble.track) : scrobble.album
+                )
+            }
             loadedAnything = true
         } catch is CancellationError {
             return
@@ -1608,6 +1674,10 @@ final class ScrobbleService: ObservableObject {
         nowPlayingTask = nil
         currentTrack = nil
         currentTrackStart = nil
+        currentTrackDetails = nil
+        currentArtistDetails = nil
+        currentOpenEntityDetails = nil
+        currentOpenEnrichment = nil
         accumulatedPlayTime = 0
         elapsedForCurrentTrack = 0
         scrobbleThreshold = 0
@@ -1618,17 +1688,46 @@ final class ScrobbleService: ObservableObject {
     }
 
     private func refreshExploreData(for track: Track) async {
-        guard isAuthenticated else {
-            exploreStatus = "Sign in to load track and artist details"
-            currentTrackDetails = nil
-            currentArtistDetails = nil
-            return
-        }
-        exploreStatus = "Loading track and artist details..."
+        exploreStatus = apiConfigured
+            ? "Loading track and artist details..."
+            : "Loading open track metadata..."
         lastAPIError = nil
         lastRecoveryHint = nil
 
         var loadedAnything = false
+        var degraded = false
+
+        guard apiConfigured else {
+            do {
+                currentOpenEntityDetails = try await musicBrainz.lookup(
+                    track: track.title,
+                    artist: track.artist,
+                    release: track.album
+                )
+                if let currentOpenEntityDetails {
+                    currentOpenEnrichment = await loadOpenEnrichment(
+                        details: currentOpenEntityDetails,
+                        track: track.title,
+                        artist: track.artist,
+                        release: track.album
+                    )
+                }
+                loadedAnything = true
+            } catch is CancellationError {
+                return
+            } catch {
+                currentOpenEntityDetails = nil
+                currentOpenEnrichment = nil
+                degraded = true
+                lastAPIError = error.localizedDescription
+            }
+            currentTrackDetails = nil
+            currentArtistDetails = nil
+            exploreStatus = loadedAnything
+                ? (degraded ? "Loaded open metadata (limited)" : "Loaded open metadata")
+                : "Failed to load open metadata"
+            return
+        }
 
         do {
             currentTrackDetails = try await api.fetchTrackDetails(artist: track.artist, track: track.title)
@@ -1637,6 +1736,7 @@ final class ScrobbleService: ObservableObject {
             return
         } catch {
             currentTrackDetails = nil
+            degraded = true
             handle(error: error)
         }
 
@@ -1647,10 +1747,197 @@ final class ScrobbleService: ObservableObject {
             return
         } catch {
             currentArtistDetails = nil
+            degraded = true
             handle(error: error)
         }
 
-        exploreStatus = loadedAnything ? "Loaded" : "Failed to load details"
+        do {
+            currentOpenEntityDetails = try await musicBrainz.lookup(
+                track: track.title,
+                artist: track.artist,
+                release: track.album
+            )
+            if let currentOpenEntityDetails {
+                currentOpenEnrichment = await loadOpenEnrichment(
+                    details: currentOpenEntityDetails,
+                    track: track.title,
+                    artist: track.artist,
+                    release: track.album
+                )
+            }
+            loadedAnything = true
+        } catch is CancellationError {
+            return
+        } catch {
+            currentOpenEntityDetails = nil
+            currentOpenEnrichment = nil
+            degraded = true
+            if lastAPIError == nil {
+                lastAPIError = error.localizedDescription
+            }
+        }
+
+        exploreStatus = loadedAnything ? (degraded ? "Loaded (limited)" : "Loaded") : "Failed to load details"
+    }
+
+    private func loadOpenEnrichment(
+        details: OpenMusicEntityDetails,
+        track: String?,
+        artist: String,
+        release: String?
+    ) async -> OpenListeningEnrichment? {
+        refreshListenBrainzState()
+        guard listenBrainzEnabled else { return nil }
+
+        let username = listenBrainzUsername?.nilIfBlank
+        let recordingPopularity = await firstPopularity(details.recordingMBID) { mbids in
+            try await listenBrainz.fetchRecordingPopularity(recordingMBIDs: mbids)
+        }
+        let artistPopularity = await firstPopularity(details.artistMBID) { mbids in
+            try await listenBrainz.fetchArtistPopularity(artistMBIDs: mbids)
+        }
+        let releasePopularity = await firstPopularity(details.releaseMBID) { mbids in
+            try await listenBrainz.fetchReleasePopularity(releaseMBIDs: mbids)
+        }
+
+        let userRecordingCount: Int?
+        let userArtistCount: Int?
+        let userReleaseCount: Int?
+        if let username {
+            userRecordingCount = await userRecordingListenCount(
+                username: username,
+                recordingMBID: details.recordingMBID,
+                track: details.trackName ?? track,
+                artist: details.artistName
+            )
+            userArtistCount = await userArtistListenCount(
+                username: username,
+                artistMBID: details.artistMBID,
+                artist: details.artistName.nilIfBlank ?? artist
+            )
+            userReleaseCount = await userReleaseListenCount(
+                username: username,
+                releaseMBID: details.releaseMBID,
+                release: details.releaseName ?? release,
+                artist: details.artistName.nilIfBlank ?? artist
+            )
+        } else {
+            userRecordingCount = nil
+            userArtistCount = nil
+            userReleaseCount = nil
+        }
+
+        let topRecordings: [ListenBrainzPopularRecording]
+        let similarArtists: [ListenBrainzSimilarArtist]
+        if let artistMBID = details.artistMBID?.nilIfBlank {
+            topRecordings = (try? await listenBrainz.fetchPopularRecordingsForArtist(
+                artistMBID: artistMBID,
+                count: 8
+            )) ?? []
+            similarArtists = (try? await listenBrainz.fetchSimilarArtists(
+                seedArtistMBID: artistMBID,
+                maxSimilarArtists: 8,
+                maxRecordingsPerArtist: 1
+            )) ?? []
+        } else {
+            topRecordings = []
+            similarArtists = []
+        }
+
+        let enrichment = OpenListeningEnrichment(
+            userRecordingListenCount: userRecordingCount,
+            userArtistListenCount: userArtistCount,
+            userReleaseListenCount: userReleaseCount,
+            globalRecordingListenCount: recordingPopularity?.totalListenCount,
+            globalRecordingListenerCount: recordingPopularity?.totalUserCount,
+            globalArtistListenCount: artistPopularity?.totalListenCount,
+            globalArtistListenerCount: artistPopularity?.totalUserCount,
+            globalReleaseListenCount: releasePopularity?.totalListenCount,
+            globalReleaseListenerCount: releasePopularity?.totalUserCount,
+            topArtistRecordings: topRecordings,
+            similarArtists: similarArtists
+        )
+        return enrichment.hasUsefulData ? enrichment : nil
+    }
+
+    private func firstPopularity(
+        _ mbid: String?,
+        fetch: ([String]) async throws -> [ListenBrainzPopularityCounts]
+    ) async -> ListenBrainzPopularityCounts? {
+        guard let mbid = mbid?.nilIfBlank else { return nil }
+        return try? await fetch([mbid]).first
+    }
+
+    private func userRecordingListenCount(
+        username: String,
+        recordingMBID: String?,
+        track: String?,
+        artist: String
+    ) async -> Int? {
+        guard let recordings = try? await listenBrainz.fetchTopRecordings(
+            username: username,
+            range: .allTime,
+            count: 1000
+        ) else { return nil }
+
+        if let recordingMBID = recordingMBID?.nilIfBlank,
+           let match = recordings.first(where: { $0.mbid?.caseInsensitiveCompare(recordingMBID) == .orderedSame }) {
+            return match.listenCount
+        }
+
+        guard let track = track?.nilIfBlank else { return nil }
+        let normalizedTrack = normalizedName(track)
+        let normalizedArtist = normalizedName(artist)
+        return recordings.first {
+            normalizedName($0.trackName) == normalizedTrack &&
+                normalizedName($0.artistName) == normalizedArtist
+        }?.listenCount
+    }
+
+    private func userArtistListenCount(username: String, artistMBID: String?, artist: String) async -> Int? {
+        guard let artists = try? await listenBrainz.fetchTopArtists(
+            username: username,
+            range: .allTime,
+            count: 1000
+        ) else { return nil }
+
+        if let artistMBID = artistMBID?.nilIfBlank,
+           let match = artists.first(where: { $0.mbid?.caseInsensitiveCompare(artistMBID) == .orderedSame }) {
+            return match.listenCount
+        }
+        let normalizedArtist = normalizedName(artist)
+        return artists.first { normalizedName($0.name) == normalizedArtist }?.listenCount
+    }
+
+    private func userReleaseListenCount(
+        username: String,
+        releaseMBID: String?,
+        release: String?,
+        artist: String
+    ) async -> Int? {
+        guard let releases = try? await listenBrainz.fetchTopReleases(
+            username: username,
+            range: .allTime,
+            count: 1000
+        ) else { return nil }
+
+        if let releaseMBID = releaseMBID?.nilIfBlank,
+           let match = releases.first(where: { $0.mbid?.caseInsensitiveCompare(releaseMBID) == .orderedSame }) {
+            return match.listenCount
+        }
+        guard let release = release?.nilIfBlank else { return nil }
+        let normalizedRelease = normalizedName(release)
+        let normalizedArtist = normalizedName(artist)
+        return releases.first {
+            normalizedName($0.name) == normalizedRelease &&
+                normalizedName($0.artistName) == normalizedArtist
+        }?.listenCount
+    }
+
+    private func normalizedName(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines)
+            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+            .lowercased()
     }
 
     private func refreshProfileData() async {
@@ -1703,14 +1990,34 @@ final class ScrobbleService: ObservableObject {
     }
 
     private func refreshScrobblesData() async {
-        guard isAuthenticated else {
-            scrobblesStatus = "Connect an account to load listens"
-            latestScrobbles = []
-            return
-        }
+        refreshListenBrainzState()
         scrobblesStatus = "Loading listens..."
         lastAPIError = nil
         lastRecoveryHint = nil
+
+        if listenBrainzEnabled, let username = listenBrainzUsername?.nilIfBlank {
+            do {
+                let listens = try await listenBrainz.fetchRecentListens(username: username, count: 100)
+                latestScrobbles = listens.map(CompatibilityRecentScrobble.init(listenBrainzListen:))
+                scrobblesStatus = "Loaded ListenBrainz listens"
+                return
+            } catch is CancellationError {
+                return
+            } catch {
+                handleListenBrainz(error: error)
+                if !isAuthenticated {
+                    latestScrobbles = []
+                    scrobblesStatus = "Failed to load ListenBrainz listens"
+                    return
+                }
+            }
+        }
+
+        guard isAuthenticated else {
+            scrobblesStatus = "Connect ListenBrainz to load listens"
+            latestScrobbles = []
+            return
+        }
 
         do {
             latestScrobbles = try await api.fetchRecentScrobbles(limit: 1000)
@@ -2235,5 +2542,21 @@ final class ScrobbleService: ObservableObject {
             }
         }
         return hydrated
+    }
+}
+
+private extension CompatibilityRecentScrobble {
+    init(listenBrainzListen listen: ListenBrainzListen) {
+        self.init(
+            id: "listenbrainz-\(listen.id)",
+            track: listen.trackName,
+            artist: listen.artistName,
+            album: listen.releaseName,
+            imageURL: nil,
+            url: listen.recordingMBID.map { "https://listenbrainz.org/player/?recording_mbids=\($0)" },
+            loved: false,
+            playedAt: listen.listenedAt,
+            nowPlaying: false
+        )
     }
 }

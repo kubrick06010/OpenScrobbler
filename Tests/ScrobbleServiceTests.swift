@@ -154,11 +154,108 @@ final class ScrobbleServiceTests: XCTestCase {
         await service.submitQueued()
 
         XCTAssertEqual(api.scrobbleAttempts, 1)
-        XCTAssertEqual(MockURLProtocol.requests.count, 1)
+        XCTAssertEqual(MockURLProtocol.requests.filter { $0.url?.path == "/1/submit-listens" }.count, 1)
         XCTAssertEqual(service.queuedSubmissionJobs.count, 1)
         XCTAssertEqual(service.queuedSubmissionJobs.first?.backend, .compatibility)
         XCTAssertEqual(service.listenBrainzStatus, "Submitted listen")
         XCTAssertTrue(service.isRetryScheduled)
+    }
+
+    @MainActor
+    func testCurrentTrackDetailsLoadFromConfiguredAPIWhenSignedOut() async {
+        let api = MockAPI()
+        api.isAuthenticated = false
+        let monitor = TestMonitor()
+        let musicBrainz = MusicBrainzService(urlSession: makeMockedSession { request in
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+
+            switch request.url!.path {
+            case "/ws/2/recording":
+                return (response, Data(#"{"recordings":[]}"#.utf8))
+            case "/ws/2/artist":
+                return (response, Data(#"{"artists":[]}"#.utf8))
+            case "/ws/2/release":
+                return (response, Data(#"{"releases":[]}"#.utf8))
+            default:
+                return (response, Data(#"{"images":[]}"#.utf8))
+            }
+        })
+        let service = ScrobbleService(
+            api: api,
+            listenBrainz: isolatedListenBrainzService(),
+            musicBrainz: musicBrainz,
+            monitor: monitor,
+            sessionStore: InMemorySessionStore(),
+            queueStore: InMemoryQueueStore()
+        )
+
+        monitor.emit(.trackStarted(makeTrack(duration: 180)))
+        try? await Task.sleep(nanoseconds: 40_000_000)
+
+        XCTAssertFalse(service.isAuthenticated)
+        XCTAssertEqual(service.currentTrackDetails?.name, "Track")
+        XCTAssertEqual(service.currentArtistDetails?.name, "Artist")
+        XCTAssertEqual(service.currentOpenEntityDetails?.artistName, "Artist")
+        XCTAssertEqual(api.trackDetailRequests.count, 1)
+        XCTAssertEqual(api.artistDetailRequests.count, 1)
+        withExtendedLifetime(service) {}
+    }
+
+    @MainActor
+    func testRecentListensLoadFromListenBrainzWhenCompatibilitySignedOut() async throws {
+        let api = MockAPI()
+        api.isAuthenticated = false
+        let monitor = TestMonitor()
+        let listenBrainz = configuredListenBrainzService(urlSession: makeMockedSession { request in
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+
+            XCTAssertEqual(request.url?.path, "/1/user/tester/listens")
+            return (response, Data(#"{"payload":{"listens":[{"listened_at":1700000100,"track_metadata":{"artist_name":"Soda Stereo","track_name":"Zoom","release_name":"Sueño Stereo","additional_info":{"recording_mbid":"recording-1","artist_mbids":["artist-1"],"release_mbid":"release-1"}}}]}}"#.utf8))
+        })
+        let service = ScrobbleService(
+            api: api,
+            listenBrainz: listenBrainz,
+            monitor: monitor,
+            sessionStore: InMemorySessionStore(),
+            queueStore: InMemoryQueueStore()
+        )
+
+        await service.refreshScrobbles()
+
+        XCTAssertFalse(service.isAuthenticated)
+        XCTAssertEqual(service.scrobblesStatus, "Loaded ListenBrainz listens")
+        XCTAssertEqual(service.latestScrobbles.count, 1)
+        XCTAssertEqual(service.latestScrobbles.first?.track, "Zoom")
+        XCTAssertEqual(service.latestScrobbles.first?.artist, "Soda Stereo")
+        XCTAssertEqual(service.latestScrobbles.first?.album, "Sueño Stereo")
+        XCTAssertEqual(service.latestScrobbles.first?.url, "https://listenbrainz.org/player/?recording_mbids=recording-1")
+        withExtendedLifetime(service) {}
+    }
+
+    @MainActor
+    func testAccountFooterPrefersListenBrainzIdentity() async {
+        let api = MockAPI()
+        api.isAuthenticated = false
+        let service = ScrobbleService(
+            api: api,
+            listenBrainz: configuredListenBrainzService(urlSession: .shared),
+            monitor: TestMonitor(),
+            sessionStore: InMemorySessionStore(),
+            queueStore: InMemoryQueueStore()
+        )
+
+        XCTAssertEqual(service.accountFooterText, "tester (ListenBrainz)")
+        withExtendedLifetime(service) {}
     }
 
     @MainActor
@@ -216,7 +313,7 @@ final class ScrobbleServiceTests: XCTestCase {
 
     private func configuredListenBrainzService(urlSession: URLSession) -> ListenBrainzService {
         let defaults = UserDefaults(suiteName: "OpenScrobblerTests-ListenBrainz-\(UUID().uuidString)")!
-        let tokenStore = InMemoryListenBrainzTokenStore(token: "test-token")
+        let tokenStore = InMemoryListenBrainzTokenStore()
         let settingsStore = ListenBrainzSettingsStore(defaults: defaults, tokenStore: tokenStore)
         settingsStore.save(
             ListenBrainzSettings(
@@ -227,6 +324,7 @@ final class ScrobbleServiceTests: XCTestCase {
                 username: "tester"
             )
         )
+        try? settingsStore.saveToken("test-token")
         return ListenBrainzService(settingsStore: settingsStore, urlSession: urlSession)
     }
 
@@ -297,6 +395,8 @@ private final class MockAPI: CompatibilityAPI {
     var isAuthenticated: Bool = true
     var sessionUsername: String?
     var scrobbledTracks: [Track] = []
+    var trackDetailRequests: [(artist: String, track: String)] = []
+    var artistDetailRequests: [String] = []
     var scrobbleFailuresRemaining: Int
     var scrobbleAttempts = 0
     var validateSessionCalls = 0
@@ -359,7 +459,8 @@ private final class MockAPI: CompatibilityAPI {
     }
 
     func fetchTrackDetails(artist: String, track: String) async throws -> CompatibilityTrackDetails {
-        CompatibilityTrackDetails(
+        trackDetailRequests.append((artist: artist, track: track))
+        return CompatibilityTrackDetails(
             name: track,
             artist: artist,
             album: "Album",
@@ -374,7 +475,8 @@ private final class MockAPI: CompatibilityAPI {
     }
 
     func fetchArtistDetails(artist: String) async throws -> CompatibilityArtistDetails {
-        CompatibilityArtistDetails(
+        artistDetailRequests.append(artist)
+        return CompatibilityArtistDetails(
             name: artist,
             imageURL: nil,
             listeners: 1,

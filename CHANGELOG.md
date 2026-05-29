@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.1 - 2026-05-29
+
+### Added
+
+- ListenBrainz enrichment for the now-playing dashboard and track detail views, including user listen counts, public popularity, top artist recordings, and similar artists.
+- Cover Art Archive artwork fallback for MusicBrainz-resolved releases.
+
+### Fixed
+
+- Preserved album context when opening track details so MusicBrainz resolves the intended recording instead of a similarly named entry.
+- Loaded ListenBrainz recent listens and account identity from a valid ListenBrainz token without requiring legacy compatibility authentication.
+- Resolved ListenBrainz recommendations to readable track and artist names instead of raw recording MBIDs.
+- Improved Apple Music and Spotify artwork propagation into OpenScrobbler views.
+
 ## 0.1.0 - 2026-05-27
 
 First public development release of OpenScrobbler.

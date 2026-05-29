@@ -160,8 +160,8 @@ struct ContentView: View {
                         switch selectedTab ?? .dashboard {
                         case .dashboard:
                             DashboardView(
-                                onOpenTrackDetail: { track, artist, imageURL in
-                                openDeepLink(track: track, artist: artist, imageURL: imageURL)
+                                onOpenTrackDetail: { track, artist, album, imageURL in
+                                    openDeepLink(track: track, artist: artist, album: album, imageURL: imageURL)
                                 },
                                 onShareTrack: { draft in
                                     shareDraft = draft
@@ -486,7 +486,7 @@ struct ContentView: View {
     private var settingsFooterLabel: some View {
         HStack(spacing: 10) {
             Image(systemName: "gearshape.fill")
-            Text("\(scrobbleService.profile?.name ?? "Guest") (\(scrobbleService.isAuthenticated ? "Online" : "Offline"))")
+            Text(scrobbleService.accountFooterText)
                 .font(.custom("Avenir Next Medium", size: 14))
             Spacer()
         }
@@ -504,14 +504,14 @@ struct ContentView: View {
         }
     }
 
-    private func openDeepLink(track: String?, artist: String, imageURL: String? = nil) {
+    private func openDeepLink(track: String?, artist: String, album: String? = nil, imageURL: String? = nil) {
         let hasTrack = track?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
         let title = hasTrack ? track! : artist
         let item = CompatibilityRecentScrobble(
             id: "deep-\(hasTrack ? "track" : "artist")-\(artist)|\(title)",
             track: title,
             artist: artist,
-            album: nil,
+            album: album,
             imageURL: imageURL,
             url: nil,
             loved: false,
@@ -642,7 +642,7 @@ private struct DashboardView: View {
     @Environment(\.openURL) private var openURL
     @EnvironmentObject private var scrobbleService: ScrobbleService
     @State private var moodPalette = DashboardMoodPalette.fallback
-    let onOpenTrackDetail: (_ track: String, _ artist: String, _ imageURL: String?) -> Void
+    let onOpenTrackDetail: (_ track: String, _ artist: String, _ album: String?, _ imageURL: String?) -> Void
     let onShareTrack: (ShareDraft) -> Void
     let onCaptureObsession: (ObsessionDraft) -> Void
 
@@ -716,8 +716,9 @@ private struct DashboardView: View {
 
                                 statGrid(metrics: metrics)
 
-                                if let tags = scrobbleService.currentArtistDetails?.tags, !tags.isEmpty {
-                                    tagLinks(title: "Popular tags", tags: Array(tags.prefix(metrics.maxTagCount)))
+                                let tags = dashboardTags
+                                if !tags.isEmpty {
+                                    tagLinks(title: "Open tags", tags: Array(tags.prefix(metrics.maxTagCount)))
                                 }
 
                                 if let similar = scrobbleService.currentArtistDetails?.similarArtists, !similar.isEmpty {
@@ -725,6 +726,20 @@ private struct DashboardView: View {
                                         Text("Similar Artists")
                                             .font(.custom("Avenir Next Demi Bold", size: metrics.sectionTitleFont))
                                         similarArtistsGrid(Array(similar.prefix(metrics.maxSimilarArtists)), metrics: metrics)
+                                    }
+                                } else if let similar = scrobbleService.currentOpenEnrichment?.similarArtists, !similar.isEmpty {
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        Text("Similar Artists")
+                                            .font(.custom("Avenir Next Demi Bold", size: metrics.sectionTitleFont))
+                                        listenBrainzSimilarArtistsGrid(Array(similar.prefix(metrics.maxSimilarArtists)), metrics: metrics)
+                                    }
+                                }
+
+                                if let top = scrobbleService.currentOpenEnrichment?.topArtistRecordings, !top.isEmpty {
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        Text("Top ListenBrainz Tracks")
+                                            .font(.custom("Avenir Next Demi Bold", size: metrics.sectionTitleFont))
+                                        popularRecordingsList(Array(top.prefix(metrics.isNarrow ? 4 : 5)))
                                     }
                                 }
                             }
@@ -884,9 +899,21 @@ private struct DashboardView: View {
 
     private func statGrid(metrics: DashboardMetrics) -> some View {
         LazyVGrid(columns: metrics.statColumns, alignment: .leading, spacing: 12) {
-            statColumn("Listeners", scrobbleService.currentArtistDetails?.listeners)
-            statColumn("Plays", scrobbleService.currentArtistDetails?.playcount)
-            statColumn("Plays in your library", scrobbleService.currentTrackDetails?.userPlaycount)
+            statColumn(
+                "Artist listeners",
+                scrobbleService.currentArtistDetails?.listeners
+                    ?? scrobbleService.currentOpenEnrichment?.globalArtistListenerCount
+            )
+            statColumn(
+                "Artist plays",
+                scrobbleService.currentArtistDetails?.playcount
+                    ?? scrobbleService.currentOpenEnrichment?.globalArtistListenCount
+            )
+            statColumn(
+                "Track plays in your library",
+                scrobbleService.currentTrackDetails?.userPlaycount
+                    ?? scrobbleService.currentOpenEnrichment?.userRecordingListenCount
+            )
         }
     }
 
@@ -894,6 +921,56 @@ private struct DashboardView: View {
         LazyVGrid(columns: metrics.similarArtistColumns, alignment: .leading, spacing: 14) {
             ForEach(artists, id: \.name) { item in
                 similarArtistLink(item, compact: metrics.isNarrow)
+            }
+        }
+    }
+
+    private func listenBrainzSimilarArtistsGrid(_ artists: [ListenBrainzSimilarArtist], metrics: DashboardMetrics) -> some View {
+        LazyVGrid(columns: metrics.similarArtistColumns, alignment: .leading, spacing: 14) {
+            ForEach(artists) { item in
+                VStack(alignment: .leading, spacing: 4) {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(placeholderFill)
+                        .frame(width: metrics.isNarrow ? 64 : 72, height: metrics.isNarrow ? 64 : 72)
+                        .overlay(
+                            Image(systemName: "waveform")
+                                .foregroundStyle(.secondary)
+                        )
+                    Text(item.name)
+                        .font(.custom("Avenir Next Medium", size: metrics.isNarrow ? 13 : 14))
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(width: metrics.isNarrow ? 84 : 96, alignment: .leading)
+                    Text("\(item.totalListenCount.formatted()) plays")
+                        .font(.custom("Avenir Next Regular", size: 11))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+        }
+    }
+
+    private func popularRecordingsList(_ recordings: [ListenBrainzPopularRecording]) -> some View {
+        VStack(spacing: 8) {
+            ForEach(recordings) { recording in
+                HStack(spacing: 10) {
+                    dashboardArt(recording.imageURL, size: 42)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(recording.title)
+                            .font(.custom("Avenir Next Medium", size: 13))
+                            .lineLimit(1)
+                        Text(recording.releaseName ?? recording.artistName)
+                            .font(.custom("Avenir Next Regular", size: 11))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    Spacer()
+                    Text(count(recording.totalListenCount))
+                        .font(.custom("Avenir Next Demi Bold", size: 12))
+                        .foregroundStyle(.secondary)
+                }
+                .padding(8)
+                .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
         }
     }
@@ -986,7 +1063,13 @@ private struct DashboardView: View {
 
     private func trackInsightsCard(fontSize: CGFloat) -> some View {
         // Keeps the library callout readable even when user-specific counters are unavailable.
-        Text("You've listened to \(scrobbleService.currentTrackDetails?.artist ?? scrobbleService.currentTrack?.artist ?? "this artist") \(count(scrobbleService.currentArtistDetails?.userPlaycount)) times and \(scrobbleService.currentTrackDetails?.name ?? scrobbleService.currentTrack?.title ?? "this track") \(count(scrobbleService.currentTrackDetails?.userPlaycount)) time(s).")
+        let artistPlays = scrobbleService.currentArtistDetails?.userPlaycount
+            ?? scrobbleService.currentOpenEnrichment?.userArtistListenCount
+        let trackPlays = scrobbleService.currentTrackDetails?.userPlaycount
+            ?? scrobbleService.currentOpenEnrichment?.userRecordingListenCount
+        let artist = scrobbleService.currentTrackDetails?.artist ?? scrobbleService.currentTrack?.artist ?? "this artist"
+        let track = scrobbleService.currentTrackDetails?.name ?? scrobbleService.currentTrack?.title ?? "this track"
+        return Text("ListenBrainz has \(count(scrobbleService.currentOpenEnrichment?.globalRecordingListenCount)) public plays for \(track). You've listened to \(artist) \(count(artistPlays)) times and \(track) \(count(trackPlays)) time(s).")
             .font(.custom("Avenir Next Medium", size: fontSize))
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -997,7 +1080,26 @@ private struct DashboardView: View {
         if let summary = scrobbleService.currentArtistDetails?.summary, !summary.isEmpty {
             return summary
         }
-        return "Artist biography and stats are temporarily unavailable."
+        if let details = scrobbleService.currentOpenEntityDetails {
+            var fragments: [String] = []
+            if let type = details.type?.nilIfBlank {
+                fragments.append("\(details.artistName) is indexed in MusicBrainz as \(type.lowercased()).")
+            } else {
+                fragments.append("\(details.artistName) is resolved through MusicBrainz open metadata.")
+            }
+            if let country = details.country?.nilIfBlank {
+                fragments.append("Country: \(country).")
+            }
+            if let plays = scrobbleService.currentOpenEnrichment?.globalArtistListenCount {
+                let listeners = count(scrobbleService.currentOpenEnrichment?.globalArtistListenerCount)
+                fragments.append("ListenBrainz shows \(plays.formatted()) public plays from \(listeners) listeners.")
+            }
+            if !details.tags.isEmpty {
+                fragments.append("Tags: \(details.tags.prefix(4).joined(separator: ", ")).")
+            }
+            return fragments.joined(separator: " ")
+        }
+        return "Open artist metadata is still loading."
     }
 
     private func statColumn(_ title: String, _ value: Int?) -> some View {
@@ -1015,6 +1117,7 @@ private struct DashboardView: View {
         onOpenTrackDetail(
             scrobbleService.currentTrackDetails?.name ?? nowPlaying.title,
             scrobbleService.currentTrackDetails?.artist ?? nowPlaying.artist,
+            scrobbleService.currentTrackDetails?.album ?? nowPlaying.album,
             dashboardTrackImageURL
         )
     }
@@ -1048,7 +1151,9 @@ private struct DashboardView: View {
 
     private var dashboardHeroImageURL: String? {
         // Prefer artist hero art for background bokeh; fallback to resolved track artwork.
-        scrobbleService.currentArtistDetails?.imageURL ?? dashboardTrackImageURL
+        scrobbleService.currentArtistDetails?.imageURL
+            ?? dashboardTrackImageURL
+            ?? scrobbleService.currentOpenEntityDetails?.imageURL
     }
 
     private var dashboardMoodKey: String {
@@ -1064,10 +1169,18 @@ private struct DashboardView: View {
     private var dashboardTrackImageURL: String? {
         // Artwork resolution chain:
         // 1) track.getInfo image
-        // 2) matching recent scrobble image (same title + artist)
-        // 3) artist image as final fallback.
+        // 2) player-supplied artwork
+        // 3) MusicBrainz/Cover Art Archive release artwork
+        // 4) matching recent scrobble image (same title + artist)
+        // 5) artist image as final fallback.
         if let explicit = scrobbleService.currentTrackDetails?.imageURL, !explicit.isEmpty {
             return explicit
+        }
+        if let localArtwork = scrobbleService.currentTrack?.artworkURL, !localArtwork.isEmpty {
+            return localArtwork
+        }
+        if let openArtwork = scrobbleService.currentOpenEntityDetails?.imageURL, !openArtwork.isEmpty {
+            return openArtwork
         }
         guard let now = scrobbleService.currentTrack else {
             return scrobbleService.currentArtistDetails?.imageURL
@@ -1082,6 +1195,13 @@ private struct DashboardView: View {
             return matched
         }
         return scrobbleService.currentArtistDetails?.imageURL
+    }
+
+    private var dashboardTags: [String] {
+        let legacy = (scrobbleService.currentArtistDetails?.tags ?? []) +
+            (scrobbleService.currentTrackDetails?.tags ?? [])
+        let open = scrobbleService.currentOpenEntityDetails?.tags ?? []
+        return (legacy + open).uniquedCaseInsensitive()
     }
 
     private func count(_ value: Int?) -> String {
@@ -1710,16 +1830,16 @@ private struct ScrobblesView: View {
 
                                 Spacer()
 
-                                HStack(spacing: 10) {
+                                if scrobbleService.isAuthenticated {
                                     Button {
                                         Task { await scrobbleService.toggleLove(scrobble: item) }
                                     } label: {
                                         Image(systemName: item.loved ? "heart.fill" : "heart")
                                     }
                                     .buttonStyle(.plain)
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(.secondary)
                                 }
-                                .font(.system(size: 13))
-                                .foregroundStyle(.secondary)
 
                                 Text(item.nowPlaying ? "Now" : (item.playedAt?.formatted(date: .omitted, time: .shortened) ?? "-"))
                                     .font(.custom("Avenir Next Regular", size: 11))
@@ -1807,6 +1927,10 @@ private struct ScrobbleDetailPanel: View {
 
                 if let openDetails = scrobbleService.inspectedOpenEntityDetails {
                     openMetadataSection(openDetails)
+                }
+
+                if let enrichment = scrobbleService.inspectedOpenEnrichment {
+                    openEnrichmentSection(enrichment, metrics: metrics)
                 }
 
                 // Mirror the legacy iOS navigation model here: related content must follow the
@@ -1908,7 +2032,7 @@ private struct ScrobbleDetailPanel: View {
             track: kind == .track ? item.track : nil,
             album: kind == .album ? (item.album ?? item.track) : item.album,
             sourceURL: item.url,
-            imageURL: scrobbleService.inspectedTrackDetails?.imageURL ?? item.imageURL,
+            imageURL: detailArtworkURL,
             artistMBID: scrobbleService.inspectedOpenEntityDetails?.artistMBID,
             recordingMBID: scrobbleService.inspectedOpenEntityDetails?.recordingMBID,
             releaseMBID: scrobbleService.inspectedOpenEntityDetails?.releaseMBID
@@ -1921,11 +2045,17 @@ private struct ScrobbleDetailPanel: View {
             track: item.track,
             album: scrobbleService.inspectedTrackDetails?.album ?? item.album,
             sourceURL: scrobbleService.inspectedTrackDetails?.url ?? item.url,
-            imageURL: scrobbleService.inspectedTrackDetails?.imageURL ?? item.imageURL,
+            imageURL: detailArtworkURL,
             artistMBID: scrobbleService.inspectedOpenEntityDetails?.artistMBID,
             recordingMBID: scrobbleService.inspectedOpenEntityDetails?.recordingMBID,
             releaseMBID: scrobbleService.inspectedOpenEntityDetails?.releaseMBID
         )
+    }
+
+    private var detailArtworkURL: String? {
+        scrobbleService.inspectedTrackDetails?.imageURL
+            ?? item.imageURL
+            ?? scrobbleService.inspectedOpenEntityDetails?.imageURL
     }
 
     private var shareKind: SharedMusicEntry.EntityKind {
@@ -2029,7 +2159,7 @@ private struct ScrobbleDetailPanel: View {
     private var headerTertiaryText: String? {
         switch kind {
         case .track:
-            if let album = scrobbleService.inspectedTrackDetails?.album {
+            if let album = scrobbleService.inspectedTrackDetails?.album ?? item.album {
                 return "from \(album)"
             }
             return nil
@@ -2099,6 +2229,51 @@ private struct ScrobbleDetailPanel: View {
         .background(Color.white.opacity(0.035), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 
+    private func openEnrichmentSection(_ enrichment: OpenListeningEnrichment, metrics: DetailPanelMetrics) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("ListenBrainz Context")
+                    .font(.custom("Avenir Next Medium", size: 17))
+                Spacer()
+                Text("Open data")
+                    .font(.custom("Avenir Next Medium", size: 11))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.white.opacity(0.06), in: Capsule())
+            }
+
+            LazyVGrid(
+                columns: metrics.isCompact
+                    ? [GridItem(.adaptive(minimum: 142), alignment: .leading)]
+                    : [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())],
+                alignment: .leading,
+                spacing: 12
+            ) {
+                stat("Your track plays", enrichment.userRecordingListenCount)
+                stat("Your artist plays", enrichment.userArtistListenCount)
+                stat("Your album plays", enrichment.userReleaseListenCount)
+                stat("Global track plays", enrichment.globalRecordingListenCount)
+                stat("Global track listeners", enrichment.globalRecordingListenerCount)
+                stat("Global artist plays", enrichment.globalArtistListenCount)
+            }
+
+            if !enrichment.similarArtists.isEmpty {
+                Text("Similar Artists")
+                    .font(.custom("Avenir Next Medium", size: 15))
+                openSimilarArtistsGrid(enrichment.similarArtists, compact: metrics.isCompact)
+            }
+
+            if !enrichment.topArtistRecordings.isEmpty {
+                Text("Top Tracks By This Artist")
+                    .font(.custom("Avenir Next Medium", size: 15))
+                openPopularRecordingsGrid(enrichment.topArtistRecordings, compact: metrics.isCompact)
+            }
+        }
+        .padding(10)
+        .background(Color.white.opacity(0.035), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
     private func metadataCell(_ title: String, _ value: String?) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
@@ -2135,6 +2310,63 @@ private struct ScrobbleDetailPanel: View {
         }
     }
 
+    private func openSimilarArtistsGrid(_ artists: [ListenBrainzSimilarArtist], compact: Bool) -> some View {
+        let columns = compact
+            ? [GridItem(.adaptive(minimum: 118), spacing: 14, alignment: .topLeading)]
+            : [GridItem(.adaptive(minimum: 132), spacing: 16, alignment: .topLeading)]
+
+        return LazyVGrid(columns: columns, alignment: .leading, spacing: 14) {
+            ForEach(artists.prefix(compact ? 6 : 8)) { artist in
+                VStack(alignment: .leading, spacing: 4) {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(Color.white.opacity(0.06))
+                        .frame(width: 74, height: 74)
+                        .overlay(
+                            Image(systemName: "waveform")
+                                .foregroundStyle(.secondary)
+                        )
+                    Text(artist.name)
+                        .font(.custom("Avenir Next Medium", size: 12))
+                        .lineLimit(2)
+                    Text("\(artist.totalListenCount.formatted()) plays")
+                        .font(.custom("Avenir Next Regular", size: 11))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+        }
+    }
+
+    private func openPopularRecordingsGrid(_ recordings: [ListenBrainzPopularRecording], compact: Bool) -> some View {
+        let columns = compact
+            ? [GridItem(.adaptive(minimum: 180), spacing: 14, alignment: .topLeading)]
+            : [GridItem(.adaptive(minimum: 220), spacing: 16, alignment: .topLeading)]
+
+        return LazyVGrid(columns: columns, alignment: .leading, spacing: 12) {
+            ForEach(recordings.prefix(compact ? 4 : 8)) { recording in
+                HStack(alignment: .top, spacing: 10) {
+                    artworkThumbnail(recording.imageURL, size: 54)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(recording.title)
+                            .font(.custom("Avenir Next Medium", size: 12))
+                            .lineLimit(2)
+                        if let release = recording.releaseName {
+                            Text(release)
+                                .font(.custom("Avenir Next Regular", size: 11))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                        Text("\(count(recording.totalListenCount)) plays")
+                            .font(.custom("Avenir Next Regular", size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(8)
+                .background(Color.white.opacity(0.035), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            }
+        }
+    }
+
     private func similarTracksGrid(_ tracks: [CompatibilitySimilarTrack], compact: Bool) -> some View {
         let columns = compact
             ? [GridItem(.adaptive(minimum: 118), spacing: 14, alignment: .topLeading)]
@@ -2161,7 +2393,7 @@ private struct ScrobbleDetailPanel: View {
 
     @ViewBuilder
     private func artwork(size: CGFloat = 180) -> some View {
-        if let urlString = scrobbleService.inspectedTrackDetails?.imageURL ?? item.imageURL,
+        if let urlString = detailArtworkURL,
            let url = URL(string: urlString) {
             AsyncImage(url: url) { phase in
                 switch phase {
@@ -2206,8 +2438,12 @@ private struct ScrobbleDetailPanel: View {
                 .font(.custom("Avenir Next Demi Bold", size: 22))
             Text(title)
                 .font(.custom("Avenir Next Medium", size: 12))
-                .foregroundStyle(.secondary)
+            .foregroundStyle(.secondary)
         }
+    }
+
+    private func count(_ value: Int?) -> String {
+        value.map { $0.formatted() } ?? "—"
     }
 
     private func tagLinks(title: String, tags: [String]) -> some View {
@@ -3116,22 +3352,6 @@ private struct ChartsView: View {
                     listeningActivityChart(snapshot.listeningActivity)
                 }
 
-                if !snapshot.topArtists.isEmpty {
-                    Text("\(snapshot.topArtists.count) ListenBrainz Artists")
-                        .font(.custom("Avenir Next Demi Bold", size: metrics.sectionCountFont - 4))
-                    VStack(spacing: 8) {
-                        ForEach(snapshot.topArtists.prefix(8)) { artist in
-                            chartRow(
-                                title: artist.name,
-                                subtitle: artist.mbid ?? "MusicBrainz metadata pending",
-                                count: artist.listenCount
-                            )
-                            .contentShape(Rectangle())
-                            .onTapGesture { onOpenArtist(artist.name) }
-                        }
-                    }
-                }
-
                 if !snapshot.topRecordings.isEmpty {
                     Text("\(snapshot.topRecordings.count) ListenBrainz Tracks")
                         .font(.custom("Avenir Next Demi Bold", size: metrics.sectionCountFont - 4))
@@ -3139,11 +3359,27 @@ private struct ChartsView: View {
                         ForEach(snapshot.topRecordings.prefix(10)) { recording in
                             chartRow(
                                 title: recording.trackName,
-                                subtitle: recording.artistName,
+                                subtitle: recordingSubtitle(recording),
                                 count: recording.listenCount
                             )
                             .contentShape(Rectangle())
                             .onTapGesture { onOpenTrack(recording.trackName, recording.artistName) }
+                        }
+                    }
+                }
+
+                if !snapshot.topArtists.isEmpty {
+                    Text("\(snapshot.topArtists.count) ListenBrainz Artists")
+                        .font(.custom("Avenir Next Demi Bold", size: metrics.sectionCountFont - 4))
+                    VStack(spacing: 8) {
+                        ForEach(snapshot.topArtists.prefix(8)) { artist in
+                            chartRow(
+                                title: artist.name,
+                                subtitle: "Artist",
+                                count: artist.listenCount
+                            )
+                            .contentShape(Rectangle())
+                            .onTapGesture { onOpenArtist(artist.name) }
                         }
                     }
                 }
@@ -3278,6 +3514,13 @@ private struct ChartsView: View {
         .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 
+    private func recordingSubtitle(_ recording: ListenBrainzRecordingStat) -> String {
+        if let release = recording.releaseName?.nilIfBlank {
+            return "\(recording.artistName) - \(release)"
+        }
+        return recording.artistName
+    }
+
     private func chartRow(title: String, subtitle: String, count: Int) -> some View {
         HStack(spacing: 10) {
             Image(systemName: "waveform")
@@ -3286,7 +3529,8 @@ private struct ChartsView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.custom("Avenir Next Medium", size: 15))
-                    .lineLimit(1)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(subtitle)
                     .font(.custom("Avenir Next Regular", size: 12))
                     .foregroundStyle(.secondary)
@@ -6105,6 +6349,17 @@ private struct HTMLSummaryText: View {
 private extension View {
     func appPanelStyle() -> some View {
         modifier(AppPanelModifier())
+    }
+}
+
+private extension Array where Element == String {
+    func uniquedCaseInsensitive() -> [String] {
+        var seen = Set<String>()
+        return filter { value in
+            let key = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            guard !key.isEmpty else { return false }
+            return seen.insert(key).inserted
+        }
     }
 }
 

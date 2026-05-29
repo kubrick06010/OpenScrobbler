@@ -27,6 +27,8 @@ final class MusicBrainzServiceTests: XCTestCase {
                 return (response, Data(Self.artistPayload.utf8))
             case "/ws/2/release":
                 return (response, Data(Self.releasePayload.utf8))
+            case "/release/release-id":
+                return (response, Data(Self.coverArtPayload.utf8))
             default:
                 XCTFail("Unexpected path \(request.url!.path)")
                 return (response, Data())
@@ -41,6 +43,7 @@ final class MusicBrainzServiceTests: XCTestCase {
         XCTAssertEqual(details.recordingMBID, "recording-id")
         XCTAssertEqual(details.artistMBID, "artist-id")
         XCTAssertEqual(details.releaseMBID, "release-id")
+        XCTAssertEqual(details.imageURL, "https://cover.example/large.jpg")
         XCTAssertEqual(details.country, "GB")
         XCTAssertTrue(details.tags.contains("trip hop"))
         XCTAssertTrue(details.links.contains { $0.url.absoluteString == "https://musicbrainz.org/recording/recording-id" })
@@ -106,6 +109,21 @@ final class MusicBrainzServiceTests: XCTestCase {
           "tags": [
             { "count": 3, "name": "downtempo" }
           ]
+        }
+      ]
+    }
+    """
+
+    private static let coverArtPayload = """
+    {
+      "images": [
+        {
+          "front": true,
+          "image": "https://cover.example/full.jpg",
+          "thumbnails": {
+            "small": "https://cover.example/small.jpg",
+            "large": "https://cover.example/large.jpg"
+          }
         }
       ]
     }

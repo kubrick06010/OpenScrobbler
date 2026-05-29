@@ -320,7 +320,9 @@ private struct MenuBarPanel: View {
 
     private var trackSubtitle: String {
         guard let currentTrack = scrobbleService.currentTrack else {
-            return scrobbleService.sessionUsername.map { "Signed in as \($0)" } ?? "Waiting for playback"
+            return scrobbleService.sessionUsername.map { "Signed in as \($0)" }
+                ?? scrobbleService.listenBrainzUsername.map { "ListenBrainz: \($0)" }
+                ?? "Waiting for playback"
         }
 
         let artist = scrobbleService.currentTrackDetails?.artist ?? currentTrack.artist
@@ -333,6 +335,12 @@ private struct MenuBarPanel: View {
     private var resolvedArtworkURL: String? {
         if let explicit = scrobbleService.currentTrackDetails?.imageURL, !explicit.isEmpty {
             return explicit
+        }
+        if let localArtwork = scrobbleService.currentTrack?.artworkURL, !localArtwork.isEmpty {
+            return localArtwork
+        }
+        if let openArtwork = scrobbleService.currentOpenEntityDetails?.imageURL, !openArtwork.isEmpty {
+            return openArtwork
         }
         if let artistImage = scrobbleService.currentArtistDetails?.imageURL, !artistImage.isEmpty {
             return artistImage

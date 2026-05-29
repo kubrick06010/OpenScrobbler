@@ -138,6 +138,23 @@ struct ListenBrainzRecommendedRecording: Identifiable, Equatable {
     let score: Double
 }
 
+struct ListenBrainzPopularityCounts: Equatable {
+    let mbid: String
+    let totalListenCount: Int?
+    let totalUserCount: Int?
+}
+
+struct ListenBrainzPopularRecording: Identifiable, Equatable {
+    let id: String
+    let recordingMbid: String
+    let title: String
+    let artistName: String
+    let releaseName: String?
+    let totalListenCount: Int?
+    let totalUserCount: Int?
+    let imageURL: String?
+}
+
 struct ListenBrainzSimilarUser: Identifiable, Equatable {
     let id: String
     let userName: String
@@ -238,7 +255,7 @@ final class ListenBrainzSettingsStore {
     }
 
     func hasStoredToken() -> Bool {
-        defaults.bool(forKey: tokenAvailableKey)
+        defaults.bool(forKey: tokenAvailableKey) || token() != nil
     }
 
     func saveToken(_ token: String) throws {
@@ -764,10 +781,87 @@ final class ListenBrainzService {
             return ListenBrainzRecommendedRecording(
                 id: item.recordingMbid,
                 recordingMbid: item.recordingMbid,
-                title: details?.recordingName ?? item.recordingMbid,
+                title: details?.recordingName ?? "Unknown track",
                 artistName: details?.artistCreditName,
                 releaseName: details?.releaseName,
                 score: item.score
+            )
+        }
+    }
+
+    func fetchRecordingPopularity(recordingMBIDs: [String]) async throws -> [ListenBrainzPopularityCounts] {
+        let normalized = normalizedMBIDs(recordingMBIDs)
+        guard !normalized.isEmpty else { return [] }
+        let payload = ListenBrainzRecordingPopularityRequest(recordingMBIDs: normalized)
+        let response: [ListenBrainzRecordingPopularityResponse] = try await postPublicJSON(
+            pathComponents: ["1", "popularity", "recording"],
+            body: payload
+        )
+        return response.map {
+            ListenBrainzPopularityCounts(
+                mbid: $0.recordingMbid,
+                totalListenCount: $0.totalListenCount,
+                totalUserCount: $0.totalUserCount
+            )
+        }
+    }
+
+    func fetchArtistPopularity(artistMBIDs: [String]) async throws -> [ListenBrainzPopularityCounts] {
+        let normalized = normalizedMBIDs(artistMBIDs)
+        guard !normalized.isEmpty else { return [] }
+        let payload = ListenBrainzArtistPopularityRequest(artistMBIDs: normalized)
+        let response: [ListenBrainzArtistPopularityResponse] = try await postPublicJSON(
+            pathComponents: ["1", "popularity", "artist"],
+            body: payload
+        )
+        return response.map {
+            ListenBrainzPopularityCounts(
+                mbid: $0.artistMbid,
+                totalListenCount: $0.totalListenCount,
+                totalUserCount: $0.totalUserCount
+            )
+        }
+    }
+
+    func fetchReleasePopularity(releaseMBIDs: [String]) async throws -> [ListenBrainzPopularityCounts] {
+        let normalized = normalizedMBIDs(releaseMBIDs)
+        guard !normalized.isEmpty else { return [] }
+        let payload = ListenBrainzReleasePopularityRequest(releaseMBIDs: normalized)
+        let response: [ListenBrainzReleasePopularityResponse] = try await postPublicJSON(
+            pathComponents: ["1", "popularity", "release"],
+            body: payload
+        )
+        return response.map {
+            ListenBrainzPopularityCounts(
+                mbid: $0.releaseMbid,
+                totalListenCount: $0.totalListenCount,
+                totalUserCount: $0.totalUserCount
+            )
+        }
+    }
+
+    func fetchPopularRecordingsForArtist(artistMBID: String, count: Int = 8) async throws -> [ListenBrainzPopularRecording] {
+        let trimmed = artistMBID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return [] }
+        var components = URLComponents(
+            url: settings.baseURL
+                .appendingPathComponent("1/popularity/top-recordings-for-artist")
+                .appendingPathComponent(trimmed),
+            resolvingAgainstBaseURL: false
+        )
+        components?.queryItems = [URLQueryItem(name: "count", value: "\(count)")]
+        guard let url = components?.url else { throw ListenBrainzError.invalidResponse }
+        let response: [ListenBrainzPopularRecordingResponse] = try await getJSON(url: url, allowNoContent: true)
+        return response.map {
+            ListenBrainzPopularRecording(
+                id: $0.recordingMbid,
+                recordingMbid: $0.recordingMbid,
+                title: $0.recordingName,
+                artistName: $0.artistName,
+                releaseName: $0.releaseName?.nilIfBlank,
+                totalListenCount: $0.totalListenCount,
+                totalUserCount: $0.totalUserCount,
+                imageURL: coverArtURL(releaseMBID: $0.caaReleaseMbid ?? $0.releaseMbid)
             )
         }
     }
@@ -907,6 +1001,27 @@ final class ListenBrainzService {
         _ = try await send(request, allowNoContent: false)
     }
 
+    private func postPublicJSON<Body: Encodable, Response: Decodable>(
+        pathComponents: [String],
+        body: Body
+    ) async throws -> Response {
+        var request = URLRequest(url: pathURL(pathComponents))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(body)
+        let data = try await send(request, allowNoContent: false)
+        return try JSONDecoder().decode(Response.self, from: data)
+    }
+
+    private func normalizedMBIDs(_ values: [String]) -> [String] {
+        Array(Set(values.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }))
+    }
+
+    private func coverArtURL(releaseMBID: String?) -> String? {
+        guard let releaseMBID = releaseMBID?.nilIfBlank else { return nil }
+        return "https://coverartarchive.org/release/\(releaseMBID)/front-250"
+    }
+
     private func fetchRecordingMetadata(recordingMBIDs: [String]) async throws -> [String: ListenBrainzRecordingMetadata] {
         let normalized = Array(Set(recordingMBIDs.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }))
         guard !normalized.isEmpty else { return [:] }
@@ -932,15 +1047,31 @@ final class ListenBrainzService {
         var output: [String: ListenBrainzRecordingMetadata] = [:]
         for mbid in normalized {
             guard let entry = object[mbid] as? [String: Any] else { continue }
+            let recording = entry["recording"] as? [String: Any]
+            let artist = entry["artist"] as? [String: Any]
+            let release = entry["release"] as? [String: Any]
             let releaseName = (entry["release_name"] as? String)?.nilIfBlank
-                ?? ((entry["release"] as? [String: Any])?["release_name"] as? String)?.nilIfBlank
-                ?? ((entry["release"] as? [String: Any])?["name"] as? String)?.nilIfBlank
+                ?? (release?["release_name"] as? String)?.nilIfBlank
+                ?? (release?["name"] as? String)?.nilIfBlank
                 ?? ((entry["releases"] as? [[String: Any]])?.first?["release_name"] as? String)?.nilIfBlank
                 ?? ((entry["releases"] as? [[String: Any]])?.first?["name"] as? String)?.nilIfBlank
+            let recordingName = (entry["recording_name"] as? String)?.nilIfBlank
+                ?? (entry["track_name"] as? String)?.nilIfBlank
+                ?? (recording?["recording_name"] as? String)?.nilIfBlank
+                ?? (recording?["track_name"] as? String)?.nilIfBlank
+                ?? (recording?["name"] as? String)?.nilIfBlank
+                ?? (recording?["title"] as? String)?.nilIfBlank
+            let artistCreditName = (entry["artist_credit_name"] as? String)?.nilIfBlank
+                ?? (entry["artist_name"] as? String)?.nilIfBlank
+                ?? (artist?["artist_credit_name"] as? String)?.nilIfBlank
+                ?? (artist?["artist_name"] as? String)?.nilIfBlank
+                ?? (artist?["name"] as? String)?.nilIfBlank
+                ?? ((artist?["artists"] as? [[String: Any]])?.first?["name"] as? String)?.nilIfBlank
+                ?? (release?["album_artist_name"] as? String)?.nilIfBlank
 
             output[mbid] = ListenBrainzRecordingMetadata(
-                recordingName: (entry["recording_name"] as? String)?.nilIfBlank,
-                artistCreditName: (entry["artist_credit_name"] as? String)?.nilIfBlank,
+                recordingName: recordingName,
+                artistCreditName: artistCreditName,
                 releaseName: releaseName
             )
         }
@@ -1296,6 +1427,88 @@ private struct ListenBrainzRecommendationsResponse: Decodable {
             case recordingMbid = "recording_mbid"
             case score
         }
+    }
+}
+
+private struct ListenBrainzRecordingPopularityRequest: Encodable {
+    let recordingMBIDs: [String]
+
+    enum CodingKeys: String, CodingKey {
+        case recordingMBIDs = "recording_mbids"
+    }
+}
+
+private struct ListenBrainzArtistPopularityRequest: Encodable {
+    let artistMBIDs: [String]
+
+    enum CodingKeys: String, CodingKey {
+        case artistMBIDs = "artist_mbids"
+    }
+}
+
+private struct ListenBrainzReleasePopularityRequest: Encodable {
+    let releaseMBIDs: [String]
+
+    enum CodingKeys: String, CodingKey {
+        case releaseMBIDs = "release_mbids"
+    }
+}
+
+private struct ListenBrainzRecordingPopularityResponse: Decodable {
+    let recordingMbid: String
+    let totalListenCount: Int?
+    let totalUserCount: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case recordingMbid = "recording_mbid"
+        case totalListenCount = "total_listen_count"
+        case totalUserCount = "total_user_count"
+    }
+}
+
+private struct ListenBrainzArtistPopularityResponse: Decodable {
+    let artistMbid: String
+    let totalListenCount: Int?
+    let totalUserCount: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case artistMbid = "artist_mbid"
+        case totalListenCount = "total_listen_count"
+        case totalUserCount = "total_user_count"
+    }
+}
+
+private struct ListenBrainzReleasePopularityResponse: Decodable {
+    let releaseMbid: String
+    let totalListenCount: Int?
+    let totalUserCount: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case releaseMbid = "release_mbid"
+        case totalListenCount = "total_listen_count"
+        case totalUserCount = "total_user_count"
+    }
+}
+
+private struct ListenBrainzPopularRecordingResponse: Decodable {
+    let artistName: String
+    let caaReleaseMbid: String?
+    let recordingMbid: String
+    let recordingName: String
+    let releaseMbid: String?
+    let releaseName: String?
+    let totalListenCount: Int?
+    let totalUserCount: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case artistName = "artist_name"
+        case caaReleaseMbid = "caa_release_mbid"
+        case recordingMbid = "recording_mbid"
+        case recordingName = "recording_name"
+        case releaseMbid = "release_mbid"
+        case releaseName = "release_name"
+        case totalListenCount = "total_listen_count"
+        case totalUserCount = "total_user_count"
     }
 }
 

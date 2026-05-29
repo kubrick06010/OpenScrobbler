@@ -5,6 +5,21 @@ struct PlayerMetadata {
     let artist: String
     let album: String?
     let duration: TimeInterval
+    let artworkURL: String?
+
+    init(
+        title: String,
+        artist: String,
+        album: String?,
+        duration: TimeInterval,
+        artworkURL: String? = nil
+    ) {
+        self.title = title
+        self.artist = artist
+        self.album = album
+        self.duration = duration
+        self.artworkURL = artworkURL
+    }
 }
 
 protocol PlayerMetadataProviding {
@@ -32,12 +47,18 @@ enum PlayerNotificationNormalizer {
         var artist = firstString(in: info, keys: ["Artist", "artist"]) ?? ""
         var album = firstString(in: info, keys: ["Album", "album"])
         var duration = durationSeconds(from: info) ?? 0
+        var artworkURL = firstString(
+            in: info,
+            keys: ["Artwork URL", "ArtworkURL", "artworkURL", "artworkUrl", "Album Artwork URL"]
+        )
 
-        if (title.isEmpty || artist.isEmpty), let fallback = metadataProvider?.fetchMetadata(for: sourceApp) {
+        if (title.isEmpty || artist.isEmpty || artworkURL?.nilIfBlank == nil),
+           let fallback = metadataProvider?.fetchMetadata(for: sourceApp) {
             if title.isEmpty { title = fallback.title }
             if artist.isEmpty { artist = fallback.artist }
             if album == nil || album?.isEmpty == true { album = fallback.album }
             if duration == 0 { duration = fallback.duration }
+            if artworkURL?.nilIfBlank == nil { artworkURL = fallback.artworkURL }
         }
 
         guard !title.isEmpty, !artist.isEmpty else {
@@ -51,7 +72,8 @@ enum PlayerNotificationNormalizer {
                 album: album,
                 duration: duration,
                 startedAt: now(),
-                sourceApp: sourceApp
+                sourceApp: sourceApp,
+                artworkURL: artworkURL?.nilIfBlank
             )
         )
     }

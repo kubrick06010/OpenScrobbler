@@ -254,7 +254,7 @@ final class ListenBrainzServiceTests: XCTestCase {
                 XCTAssertEqual(json["inc"] as? String, "artist release")
                 let mbids = try XCTUnwrap(json["recording_mbids"] as? [String])
                 XCTAssertEqual(Set(mbids), Set(["mbid-1", "mbid-2"]))
-                return (response, Data(#"{"mbid-1":{"recording_name":"Track One","artist_credit_name":"Artist One","release_name":"Album One"},"mbid-2":{"recording_name":"Track Two","artist_credit_name":"Artist Two","release":{"name":"Album Two"}}}"#.utf8))
+                return (response, Data(#"{"mbid-1":{"recording_name":"Track One","artist_credit_name":"Artist One","release_name":"Album One"},"mbid-2":{"recording":{"name":"Track Two"},"artist":{"name":"Artist Two","artists":[{"name":"Ignored Artist"}]},"release":{"name":"Album Two"}}}"#.utf8))
             default:
                 XCTFail("Unexpected request \(request.httpMethod ?? "GET") \(request.url!.path)")
                 return (response, Data())
@@ -269,7 +269,45 @@ final class ListenBrainzServiceTests: XCTestCase {
         XCTAssertEqual(recommendations.first?.artistName, "Artist One")
         XCTAssertEqual(recommendations.first?.releaseName, "Album One")
         XCTAssertEqual(recommendations.last?.title, "Track Two")
+        XCTAssertEqual(recommendations.last?.artistName, "Artist Two")
         XCTAssertEqual(recommendations.last?.releaseName, "Album Two")
+    }
+
+    func testFetchPopularityAndTopRecordingsForArtist() async throws {
+        let service = makeService(tokenStore: TestListenBrainzTokenStore(token: "token")) { request in
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+
+            switch (request.httpMethod ?? "GET", request.url!.path) {
+            case ("POST", "/1/popularity/recording"):
+                return (response, Data(#"[{"recording_mbid":"rec-1","total_listen_count":42,"total_user_count":7}]"#.utf8))
+            case ("POST", "/1/popularity/artist"):
+                return (response, Data(#"[{"artist_mbid":"artist-1","total_listen_count":1200,"total_user_count":80}]"#.utf8))
+            case ("POST", "/1/popularity/release"):
+                return (response, Data(#"[{"release_mbid":"release-1","total_listen_count":90,"total_user_count":12}]"#.utf8))
+            case ("GET", "/1/popularity/top-recordings-for-artist/artist-1"):
+                XCTAssertEqual(request.url?.query, "count=2")
+                return (response, Data(#"[{"artist_name":"Artist","caa_release_mbid":"cover-release","recording_mbid":"rec-1","recording_name":"Track","release_mbid":"release-1","release_name":"Album","total_listen_count":42,"total_user_count":7}]"#.utf8))
+            default:
+                XCTFail("Unexpected request \(request.httpMethod ?? "GET") \(request.url!.path)")
+                return (response, Data())
+            }
+        }
+
+        let recording = try await service.fetchRecordingPopularity(recordingMBIDs: ["rec-1"]).first
+        let artist = try await service.fetchArtistPopularity(artistMBIDs: ["artist-1"]).first
+        let release = try await service.fetchReleasePopularity(releaseMBIDs: ["release-1"]).first
+        let top = try await service.fetchPopularRecordingsForArtist(artistMBID: "artist-1", count: 2)
+
+        XCTAssertEqual(recording?.totalListenCount, 42)
+        XCTAssertEqual(artist?.totalUserCount, 80)
+        XCTAssertEqual(release?.totalListenCount, 90)
+        XCTAssertEqual(top.first?.title, "Track")
+        XCTAssertEqual(top.first?.imageURL, "https://coverartarchive.org/release/cover-release/front-250")
     }
 
     func testRecommendRecordingPostsRecipientsAndBlurb() async throws {

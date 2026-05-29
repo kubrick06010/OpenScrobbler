@@ -13,6 +13,7 @@ struct OpenMusicEntityDetails: Equatable {
     let recordingMBID: String?
     let artistMBID: String?
     let releaseMBID: String?
+    let imageURL: String?
     let disambiguation: String?
     let country: String?
     let type: String?
@@ -26,13 +27,16 @@ struct OpenMusicEntityDetails: Equatable {
 
 final class MusicBrainzService {
     private let baseURL: URL
+    private let coverArtBaseURL: URL
     private let urlSession: URLSession
 
     init(
         baseURL: URL = URL(string: "https://musicbrainz.org/ws/2")!,
+        coverArtBaseURL: URL = URL(string: "https://coverartarchive.org/release")!,
         urlSession: URLSession = .shared
     ) {
         self.baseURL = baseURL
+        self.coverArtBaseURL = coverArtBaseURL
         self.urlSession = urlSession
     }
 
@@ -53,6 +57,12 @@ final class MusicBrainzService {
         let artistMBID = resolvedRecording?.artistCredit?.first?.artist.id ?? resolvedArtist?.id
         let releaseMBID = resolvedRecording?.releases?.first?.id ?? resolvedRelease?.id
         let resolvedReleaseName = release?.nilIfBlank ?? resolvedRecording?.releases?.first?.title ?? resolvedRelease?.title
+        let imageURL: String?
+        if let releaseMBID {
+            imageURL = try? await fetchCoverArt(releaseMBID: releaseMBID)
+        } else {
+            imageURL = nil
+        }
         let tags = ((resolvedRecording?.tags ?? []) + (resolvedArtist?.tags ?? []) + (resolvedRelease?.tags ?? []))
             .sorted { $0.count > $1.count }
             .map(\.name)
@@ -65,12 +75,48 @@ final class MusicBrainzService {
             recordingMBID: recordingMBID,
             artistMBID: artistMBID,
             releaseMBID: releaseMBID,
+            imageURL: imageURL,
             disambiguation: resolvedRecording?.disambiguation?.nilIfBlank ?? resolvedArtist?.disambiguation?.nilIfBlank,
             country: resolvedArtist?.country?.nilIfBlank,
             type: resolvedArtist?.type?.nilIfBlank ?? resolvedRelease?.status?.nilIfBlank,
             tags: Array(tags.prefix(12)),
             links: links(recordingMBID: recordingMBID, artistMBID: artistMBID, releaseMBID: releaseMBID)
         )
+    }
+
+    private func fetchCoverArt(releaseMBID: String) async throws -> String? {
+        let url = coverArtBaseURL.appendingPathComponent(releaseMBID)
+        var request = URLRequest(url: url)
+        request.setValue("OpenScrobbler/0.1.0 ( https://github.com/openscrobbler )", forHTTPHeaderField: "User-Agent")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        let (data, response) = try await urlSession.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw MusicBrainzError.invalidResponse
+        }
+        guard (200..<300).contains(http.statusCode) else {
+            throw MusicBrainzError.api(message: "Cover Art Archive returned HTTP \(http.statusCode).")
+        }
+
+        let responsePayload = try JSONDecoder().decode(CoverArtArchiveResponse.self, from: data)
+        return bestCoverArtURL(from: responsePayload)
+    }
+
+    private func bestCoverArtURL(from response: CoverArtArchiveResponse) -> String? {
+        let images = response.images.sorted { lhs, rhs in
+            (lhs.front ?? false) && !(rhs.front ?? false)
+        }
+        for image in images {
+            for key in ["1200", "large", "500", "250", "small"] {
+                if let candidate = image.thumbnails?[key]?.nilIfBlank {
+                    return candidate
+                }
+            }
+            if let candidate = image.image?.nilIfBlank {
+                return candidate
+            }
+        }
+        return nil
     }
 
     private func searchRecording(title: String, artist: String, release: String?) async throws -> MusicBrainzRecording? {
@@ -237,6 +283,16 @@ private struct MusicBrainzRelease: Decodable {
 private struct MusicBrainzTag: Decodable {
     let count: Int
     let name: String
+}
+
+private struct CoverArtArchiveResponse: Decodable {
+    let images: [CoverArtArchiveImage]
+}
+
+private struct CoverArtArchiveImage: Decodable {
+    let image: String?
+    let front: Bool?
+    let thumbnails: [String: String]?
 }
 
 private extension Array where Element == String {

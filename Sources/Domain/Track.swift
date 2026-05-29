@@ -8,6 +8,7 @@ struct Track: Identifiable, Hashable, Codable {
     let duration: TimeInterval
     let startedAt: Date
     let sourceApp: String?
+    let artworkURL: String?
 
     init(
         id: UUID = UUID(),
@@ -16,7 +17,8 @@ struct Track: Identifiable, Hashable, Codable {
         album: String?,
         duration: TimeInterval,
         startedAt: Date,
-        sourceApp: String? = nil
+        sourceApp: String? = nil,
+        artworkURL: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -25,6 +27,7 @@ struct Track: Identifiable, Hashable, Codable {
         self.duration = duration
         self.startedAt = startedAt
         self.sourceApp = sourceApp
+        self.artworkURL = artworkURL
     }
 
     var fingerprint: String {

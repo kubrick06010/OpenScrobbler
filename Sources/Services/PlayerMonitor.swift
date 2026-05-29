@@ -91,7 +91,7 @@ final class AppleScriptMetadataProvider: PlayerMetadataProviding {
             script = """
             tell application "Spotify"
                 if player state is playing then
-                    return (name of current track) & "||" & (artist of current track) & "||" & (album of current track) & "||" & (duration of current track)
+                    return (name of current track) & "||" & (artist of current track) & "||" & (album of current track) & "||" & (duration of current track) & "||" & (artwork url of current track)
                 end if
             end tell
             """
@@ -133,7 +133,8 @@ final class AppleScriptMetadataProvider: PlayerMetadataProviding {
             title: components[0],
             artist: components[1],
             album: components[2].isEmpty ? nil : components[2],
-            duration: duration
+            duration: duration,
+            artworkURL: components.indices.contains(4) ? components[4].nilIfBlank : nil
         )
     }
 }
