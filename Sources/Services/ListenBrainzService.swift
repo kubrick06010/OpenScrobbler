@@ -149,6 +149,28 @@ struct ListenBrainzPopularityCounts: Equatable {
     let totalUserCount: Int?
 }
 
+struct ListenBrainzArtistTag: Identifiable, Equatable {
+    let id: String
+    let name: String
+    let count: Int
+}
+
+struct ListenBrainzArtistLink: Identifiable, Equatable {
+    let id: String
+    let title: String
+    let url: URL
+}
+
+struct ListenBrainzArtistProfile: Equatable {
+    let mbid: String
+    let name: String
+    let area: String?
+    let beginYear: Int?
+    let type: String?
+    let tags: [ListenBrainzArtistTag]
+    let links: [ListenBrainzArtistLink]
+}
+
 struct ListenBrainzPopularRecording: Identifiable, Equatable {
     let id: String
     let recordingMbid: String
@@ -852,6 +874,22 @@ final class ListenBrainzService {
         }
     }
 
+    func fetchArtistProfile(artistMBID: String) async throws -> ListenBrainzArtistProfile? {
+        let trimmed = artistMBID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        var components = URLComponents(
+            url: settings.baseURL.appendingPathComponent("1/metadata/artist/"),
+            resolvingAgainstBaseURL: false
+        )
+        components?.queryItems = [
+            URLQueryItem(name: "artist_mbids", value: trimmed),
+            URLQueryItem(name: "inc", value: "artist tag release")
+        ]
+        guard let url = components?.url else { throw ListenBrainzError.invalidResponse }
+        let response: [ListenBrainzArtistMetadataResponse] = try await getJSON(url: url, allowNoContent: true)
+        return response.first.map(artistProfile)
+    }
+
     func fetchPopularRecordingsForArtist(artistMBID: String, count: Int = 8) async throws -> [ListenBrainzPopularRecording] {
         let trimmed = artistMBID.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return [] }
@@ -1108,6 +1146,45 @@ final class ListenBrainzService {
             }
         }
         return nil
+    }
+
+    private func artistProfile(from response: ListenBrainzArtistMetadataResponse) -> ListenBrainzArtistProfile {
+        let tags = (response.tag?.artist ?? [])
+            .compactMap { tag -> ListenBrainzArtistTag? in
+                guard let name = tag.tag.nilIfBlank else { return nil }
+                return ListenBrainzArtistTag(
+                    id: tag.genreMbid?.nilIfBlank ?? name.lowercased(),
+                    name: name,
+                    count: tag.count
+                )
+            }
+            .sorted { lhs, rhs in
+                if lhs.count == rhs.count {
+                    return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+                }
+                return lhs.count > rhs.count
+            }
+
+        let links = (response.rels ?? [:])
+            .sorted { $0.key < $1.key }
+            .compactMap { relation, rawURL -> ListenBrainzArtistLink? in
+                guard let url = URL(string: rawURL), url.scheme != nil else { return nil }
+                return ListenBrainzArtistLink(
+                    id: "\(relation)-\(rawURL)",
+                    title: relation.capitalized,
+                    url: url
+                )
+            }
+
+        return ListenBrainzArtistProfile(
+            mbid: response.artistMbid.nilIfBlank ?? response.mbid,
+            name: response.name,
+            area: response.area?.nilIfBlank,
+            beginYear: response.beginYear,
+            type: response.type?.nilIfBlank,
+            tags: tags,
+            links: links
+        )
     }
 
     private func fetchPlaylistSummaries(pathComponents: [String], count: Int) async throws -> [ListenBrainzPlaylistSummary] {
@@ -1541,6 +1618,44 @@ private struct ListenBrainzPopularRecordingResponse: Decodable {
         case releaseName = "release_name"
         case totalListenCount = "total_listen_count"
         case totalUserCount = "total_user_count"
+    }
+}
+
+private struct ListenBrainzArtistMetadataResponse: Decodable {
+    let area: String?
+    let artistMbid: String
+    let beginYear: Int?
+    let mbid: String
+    let name: String
+    let rels: [String: String]?
+    let tag: Tags?
+    let type: String?
+
+    struct Tags: Decodable {
+        let artist: [ArtistTag]
+    }
+
+    struct ArtistTag: Decodable {
+        let count: Int
+        let genreMbid: String?
+        let tag: String
+
+        enum CodingKeys: String, CodingKey {
+            case count
+            case genreMbid = "genre_mbid"
+            case tag
+        }
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case area
+        case artistMbid = "artist_mbid"
+        case beginYear = "begin_year"
+        case mbid
+        case name
+        case rels
+        case tag
+        case type
     }
 }
 

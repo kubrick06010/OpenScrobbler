@@ -49,6 +49,38 @@ final class MusicBrainzServiceTests: XCTestCase {
         XCTAssertTrue(details.links.contains { $0.url.absoluteString == "https://musicbrainz.org/recording/recording-id" })
     }
 
+    func testLookupAvoidsAmbiguousSameNameRecordingFromDifferentArtist() async throws {
+        let service = makeService { request in
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+
+            switch request.url!.path {
+            case "/ws/2/recording":
+                return (response, Data(Self.ambiguousRecordingPayload.utf8))
+            case "/ws/2/artist":
+                return (response, Data(Self.artistPayload.utf8))
+            case "/ws/2/release":
+                return (response, Data(Self.emptyReleasePayload.utf8))
+            default:
+                XCTFail("Unexpected path \(request.url!.path)")
+                return (response, Data())
+            }
+        }
+
+        let details = try await service.lookup(track: "Track", artist: "Artist", release: nil)
+
+        XCTAssertEqual(details.trackName, "Track")
+        XCTAssertEqual(details.artistName, "Artist")
+        XCTAssertNil(details.recordingMBID)
+        XCTAssertEqual(details.artistMBID, "artist-id")
+        XCTAssertNil(details.releaseName)
+        XCTAssertNil(details.releaseMBID)
+    }
+
     private func makeService(
         handler: @escaping (URLRequest) throws -> (HTTPURLResponse, Data)
     ) -> MusicBrainzService {
@@ -126,6 +158,29 @@ final class MusicBrainzServiceTests: XCTestCase {
           }
         }
       ]
+    }
+    """
+
+    private static let ambiguousRecordingPayload = """
+    {
+      "recordings": [
+        {
+          "id": "wrong-recording-id",
+          "title": "Track",
+          "artist-credit": [
+            { "artist": { "id": "different-artist-id", "name": "Artist" } }
+          ],
+          "releases": [
+            { "id": "wrong-release-id", "title": "Wrong Compilation", "status": "Official" }
+          ]
+        }
+      ]
+    }
+    """
+
+    private static let emptyReleasePayload = """
+    {
+      "releases": []
     }
     """
 }

@@ -47,30 +47,29 @@ final class MusicBrainzService {
     }
 
     func lookup(track: String?, artist: String, release: String?) async throws -> OpenMusicEntityDetails {
-        // Run broad searches in parallel; MusicBrainz data can be sparse, so the
-        // result is assembled from the best recording, artist, and release match.
-        async let recording = track.flatMap { title in
-            Task { try await searchRecording(title: title, artist: artist, release: release) }
-        }?.value
-        async let artistMatch = searchArtist(name: artist)
-        async let releaseMatch = release.flatMap { releaseName in
-            Task { try await searchRelease(title: releaseName, artist: artist) }
-        }?.value
+        // Run broad searches in parallel, but keep partial data when one open
+        // endpoint is slow or unavailable. A single Cover Art/MusicBrainz miss
+        // should not blank the whole dashboard.
+        async let recordingResult = searchRecordingResult(track: track, artist: artist, release: release)
+        async let artistResult = optionalResult { try await searchArtist(name: artist) }
+        async let releaseResult = searchReleaseResult(release: release, artist: artist)
 
-        let resolvedRecording = try await recording
-        let resolvedArtist = try await artistMatch
-        let resolvedRelease = try await releaseMatch
+        let broadRecording = try? await recordingResult.get()
+        let resolvedArtist = try? await artistResult.get()
+        let resolvedRelease = try? await releaseResult.get()
+        let resolvedRecording = coherentRecording(broadRecording, requestedArtist: artist, resolvedArtist: resolvedArtist)
+        let selectedRelease = bestRelease(
+            from: resolvedRecording?.releases,
+            fallback: resolvedRelease,
+            requestedRelease: release
+        )
 
         let recordingMBID = resolvedRecording?.id
         let artistMBID = resolvedRecording?.artistCredit?.first?.artist.id ?? resolvedArtist?.id
-        let releaseMBID = resolvedRecording?.releases?.first?.id ?? resolvedRelease?.id
-        let resolvedReleaseName = release?.nilIfBlank ?? resolvedRecording?.releases?.first?.title ?? resolvedRelease?.title
-        let imageURL: String?
-        if let releaseMBID {
-            imageURL = try? await fetchCoverArt(releaseMBID: releaseMBID)
-        } else {
-            imageURL = nil
-        }
+        let releaseMBID = selectedRelease?.id
+        let releaseGroupMBID = selectedRelease?.releaseGroup?.id
+        let resolvedReleaseName = release?.nilIfBlank ?? selectedRelease?.title
+        let imageURL = await fetchBestCoverArt(releaseMBID: releaseMBID, releaseGroupMBID: releaseGroupMBID)
         let artistSupplement = await fetchArtistSupplement(from: resolvedArtist)
         var resolvedTags: [MusicBrainzTag] = []
         if let recordingTags = resolvedRecording?.tags {
@@ -107,6 +106,16 @@ final class MusicBrainzService {
 
     func fetchCoverArt(releaseMBID: String) async throws -> String? {
         let url = coverArtBaseURL.appendingPathComponent(releaseMBID)
+        return try await fetchCoverArt(url: url)
+    }
+
+    private func fetchReleaseGroupCoverArt(releaseGroupMBID: String) async throws -> String? {
+        let url = URL(string: "https://coverartarchive.org/release-group")!
+            .appendingPathComponent(releaseGroupMBID)
+        return try await fetchCoverArt(url: url)
+    }
+
+    private func fetchCoverArt(url: URL) async throws -> String? {
         var request = URLRequest(url: url)
         request.setValue("OpenScrobbler/0.1.0 ( https://github.com/openscrobbler )", forHTTPHeaderField: "User-Agent")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -121,6 +130,16 @@ final class MusicBrainzService {
 
         let responsePayload = try JSONDecoder().decode(CoverArtArchiveResponse.self, from: data)
         return bestCoverArtURL(from: responsePayload)
+    }
+
+    private func fetchBestCoverArt(releaseMBID: String?, releaseGroupMBID: String?) async -> String? {
+        if let releaseMBID, let image = try? await fetchCoverArt(releaseMBID: releaseMBID) {
+            return image
+        }
+        if let releaseGroupMBID, let image = try? await fetchReleaseGroupCoverArt(releaseGroupMBID: releaseGroupMBID) {
+            return image
+        }
+        return nil
     }
 
     private func bestCoverArtURL(from response: CoverArtArchiveResponse) -> String? {
@@ -207,7 +226,7 @@ final class MusicBrainzService {
         components?.queryItems = [
             URLQueryItem(name: "query", value: query),
             URLQueryItem(name: "fmt", value: "json"),
-            URLQueryItem(name: "limit", value: "1"),
+            URLQueryItem(name: "limit", value: "5"),
             URLQueryItem(name: "inc", value: includes)
         ]
         guard let url = components?.url else { throw MusicBrainzError.invalidResponse }
@@ -295,6 +314,78 @@ final class MusicBrainzService {
 
     private func quoted(_ value: String) -> String {
         "\"\(value.replacingOccurrences(of: "\"", with: ""))\""
+    }
+
+    private func optionalResult<T>(_ operation: () async throws -> T?) async -> Result<T?, Error> {
+        do {
+            return .success(try await operation())
+        } catch {
+            return .failure(error)
+        }
+    }
+
+    private func searchRecordingResult(
+        track: String?,
+        artist: String,
+        release: String?
+    ) async -> Result<MusicBrainzRecording?, Error> {
+        guard let track else { return .success(nil) }
+        return await optionalResult {
+            try await searchRecording(title: track, artist: artist, release: release)
+        }
+    }
+
+    private func searchReleaseResult(
+        release: String?,
+        artist: String
+    ) async -> Result<MusicBrainzRelease?, Error> {
+        guard let release else { return .success(nil) }
+        return await optionalResult {
+            try await searchRelease(title: release, artist: artist)
+        }
+    }
+
+    private func coherentRecording(
+        _ recording: MusicBrainzRecording?,
+        requestedArtist: String,
+        resolvedArtist: MusicBrainzArtist?
+    ) -> MusicBrainzRecording? {
+        guard let recording else { return nil }
+        guard let resolvedArtist else { return recording }
+        let recordingArtist = recording.artistCredit?.first?.artist
+        if recordingArtist?.id == resolvedArtist.id {
+            return recording
+        }
+
+        // MusicBrainz has many same-name artists. If the recording belongs to a
+        // different MBID than the artist search selected, using its release/cover
+        // produces misleading detail like the wrong album in the inspector.
+        if normalized(recordingArtist?.name) == normalized(requestedArtist),
+           normalized(resolvedArtist.name) == normalized(requestedArtist) {
+            return nil
+        }
+        return recording
+    }
+
+    private func bestRelease(
+        from releases: [MusicBrainzRelease]?,
+        fallback: MusicBrainzRelease?,
+        requestedRelease: String?
+    ) -> MusicBrainzRelease? {
+        let candidates = (releases ?? []) + [fallback].compactMap { $0 }
+        guard !candidates.isEmpty else { return nil }
+        if let requested = requestedRelease?.nilIfBlank,
+           let exact = candidates.first(where: { normalized($0.title) == normalized(requested) }) {
+            return exact
+        }
+        return candidates.first(where: { $0.coverArtArchive?.front == true }) ?? candidates.first
+    }
+
+    private func normalized(_ value: String?) -> String {
+        value?
+            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased() ?? ""
     }
 
     private func links(recordingMBID: String?, artistMBID: String?, releaseMBID: String?) -> [OpenMusicEntityDetails.Link] {
@@ -400,6 +491,25 @@ private struct MusicBrainzRelease: Decodable {
     let title: String
     let status: String?
     let tags: [MusicBrainzTag]?
+    let releaseGroup: MusicBrainzReleaseGroup?
+    let coverArtArchive: MusicBrainzCoverArtArchive?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case title
+        case status
+        case tags
+        case releaseGroup = "release-group"
+        case coverArtArchive = "cover-art-archive"
+    }
+}
+
+private struct MusicBrainzReleaseGroup: Decodable {
+    let id: String
+}
+
+private struct MusicBrainzCoverArtArchive: Decodable {
+    let front: Bool?
 }
 
 private struct MusicBrainzTag: Decodable {

@@ -718,11 +718,20 @@ private struct DashboardView: View {
                                     }
                                 }
 
+                                if let profile = scrobbleService.currentOpenEnrichment?.artistProfile {
+                                    listenBrainzArtistProfile(profile, metrics: metrics)
+                                }
+
                                 statGrid(metrics: metrics)
 
-                                let tags = dashboardTags
-                                if !tags.isEmpty {
-                                    tagLinks(title: "Open tags", tags: Array(tags.prefix(metrics.maxTagCount)))
+                                if let weightedTags = scrobbleService.currentOpenEnrichment?.artistProfile?.tags,
+                                   !weightedTags.isEmpty {
+                                    weightedTagLinks(title: "ListenBrainz tags", tags: Array(weightedTags.prefix(metrics.maxTagCount + 4)))
+                                } else {
+                                    let tags = dashboardTags
+                                    if !tags.isEmpty {
+                                        tagLinks(title: "Open tags", tags: Array(tags.prefix(metrics.maxTagCount)))
+                                    }
                                 }
 
                                 if let similar = scrobbleService.currentArtistDetails?.similarArtists, !similar.isEmpty {
@@ -919,27 +928,63 @@ private struct DashboardView: View {
     }
 
     private func similarArtistsGrid(_ artists: [CompatibilitySimilarArtist], metrics: DashboardMetrics) -> some View {
-        LazyVGrid(columns: metrics.similarArtistColumns, alignment: .leading, spacing: 14) {
-            ForEach(artists, id: \.name) { item in
-                similarArtistLink(item, compact: metrics.isNarrow)
+        Group {
+            if artists.count >= 3 {
+                SimilarArtistGraphView(
+                    centerName: scrobbleService.currentArtistDetails?.name ?? scrobbleService.currentTrack?.artist ?? "Artist",
+                    nodes: artists.enumerated().map { index, artist in
+                        SimilarArtistGraphNode(
+                            id: "\(index)-\(artist.name)",
+                            name: artist.name,
+                            value: Double(max(1, artists.count - index)),
+                            imageURL: artist.imageURL
+                        )
+                    },
+                    compact: metrics.isNarrow
+                )
+                .frame(height: metrics.isNarrow ? 320 : 420)
+            } else {
+                LazyVGrid(columns: metrics.similarArtistColumns, alignment: .leading, spacing: 14) {
+                    ForEach(artists, id: \.name) { item in
+                        similarArtistLink(item, compact: metrics.isNarrow)
+                    }
+                }
             }
         }
     }
 
     private func listenBrainzSimilarArtistsGrid(_ artists: [ListenBrainzSimilarArtist], metrics: DashboardMetrics) -> some View {
-        LazyVGrid(columns: metrics.similarArtistColumns, alignment: .leading, spacing: 14) {
-            ForEach(artists) { item in
-                VStack(alignment: .leading, spacing: 4) {
-                    dashboardArt(item.imageURL, size: metrics.isNarrow ? 64 : 72)
-                    Text(item.name)
-                        .font(.custom("Avenir Next Medium", size: metrics.isNarrow ? 13 : 14))
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(width: metrics.isNarrow ? 84 : 96, alignment: .leading)
-                    Text("\(item.totalListenCount.formatted()) plays")
-                        .font(.custom("Avenir Next Regular", size: 11))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+        Group {
+            if artists.count >= 3 {
+                SimilarArtistGraphView(
+                    centerName: scrobbleService.currentArtistDetails?.name ?? scrobbleService.currentTrack?.artist ?? "Artist",
+                    nodes: artists.enumerated().map { index, artist in
+                        SimilarArtistGraphNode(
+                            id: "\(index)-\(artist.id)",
+                            name: artist.name,
+                            value: Double(max(1, artist.totalListenCount)),
+                            imageURL: artist.imageURL
+                        )
+                    },
+                    compact: metrics.isNarrow
+                )
+                .frame(height: metrics.isNarrow ? 320 : 420)
+            } else {
+                LazyVGrid(columns: metrics.similarArtistColumns, alignment: .leading, spacing: 14) {
+                    ForEach(artists) { item in
+                        VStack(alignment: .leading, spacing: 4) {
+                            dashboardArt(item.imageURL, size: metrics.isNarrow ? 64 : 72)
+                            Text(item.name)
+                                .font(.custom("Avenir Next Medium", size: metrics.isNarrow ? 13 : 14))
+                                .lineLimit(2)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(width: metrics.isNarrow ? 84 : 96, alignment: .leading)
+                            Text("\(item.totalListenCount.formatted()) plays")
+                                .font(.custom("Avenir Next Regular", size: 11))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                    }
                 }
             }
         }
@@ -1074,10 +1119,25 @@ private struct DashboardView: View {
         }
         if let details = scrobbleService.currentOpenEntityDetails {
             var fragments: [String] = []
-            if let type = details.type?.nilIfBlank {
-                fragments.append("\(details.artistName) is indexed in MusicBrainz as \(type.lowercased()).")
+            if let profile = scrobbleService.currentOpenEnrichment?.artistProfile {
+                let type = profile.type?.nilIfBlank ?? details.type?.nilIfBlank
+                var leading = "\(details.artistName) is indexed in ListenBrainz"
+                if let type {
+                    leading += " as \(type.lowercased())"
+                }
+                if let beginYear = profile.beginYear {
+                    leading += " formed in \(beginYear)"
+                }
+                fragments.append(leading + ".")
+                if let area = profile.area {
+                    fragments.append("Area: \(area).")
+                }
             } else {
-                fragments.append("\(details.artistName) is resolved through MusicBrainz open metadata.")
+                if let type = details.type?.nilIfBlank {
+                    fragments.append("\(details.artistName) is indexed in MusicBrainz as \(type.lowercased()).")
+                } else {
+                    fragments.append("\(details.artistName) is resolved through MusicBrainz open metadata.")
+                }
             }
             if let country = details.country?.nilIfBlank {
                 fragments.append("Country: \(country).")
@@ -1086,12 +1146,57 @@ private struct DashboardView: View {
                 let listeners = count(scrobbleService.currentOpenEnrichment?.globalArtistListenerCount)
                 fragments.append("ListenBrainz shows \(plays.formatted()) public plays from \(listeners) listeners.")
             }
-            if !details.tags.isEmpty {
-                fragments.append("Tags: \(details.tags.prefix(4).joined(separator: ", ")).")
+            let tags = scrobbleService.currentOpenEnrichment?.artistProfile?.tags.map(\.name) ?? details.tags
+            if !tags.isEmpty {
+                fragments.append("Tags: \(tags.prefix(4).joined(separator: ", ")).")
             }
             return fragments.joined(separator: " ")
         }
         return "Open artist metadata is still loading."
+    }
+
+    private func listenBrainzArtistProfile(_ profile: ListenBrainzArtistProfile, metrics: DashboardMetrics) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: "waveform.path.ecg")
+                    .foregroundStyle(.secondary)
+                Text("ListenBrainz Artist Profile")
+                    .font(.custom("Avenir Next Demi Bold", size: metrics.sectionTitleFont - 2))
+                Spacer()
+            }
+
+            LazyVGrid(columns: metrics.statColumns, alignment: .leading, spacing: 10) {
+                profileFact("Formed", profile.beginYear.map(String.init) ?? "—")
+                profileFact("Area", profile.area ?? "—")
+                profileFact("Type", profile.type ?? "—")
+            }
+
+            let links = preferredArtistLinks(profile.links)
+            if !links.isEmpty {
+                HStack(spacing: 8) {
+                    ForEach(links.prefix(4)) { link in
+                        Button(link.title) {
+                            openURL(link.url)
+                        }
+                        .buttonStyle(.bordered)
+                        .font(.custom("Avenir Next Medium", size: 12))
+                    }
+                }
+            }
+        }
+        .padding(10)
+        .background(calloutBackground, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+    }
+
+    private func profileFact(_ title: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.custom("Avenir Next Medium", size: 11))
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.custom("Avenir Next Demi Bold", size: 14))
+                .lineLimit(1)
+        }
     }
 
     private func statColumn(_ title: String, _ value: Int?) -> some View {
@@ -1214,6 +1319,40 @@ private struct DashboardView: View {
                         .background(Color.white.opacity(0.06), in: Capsule())
                 }
             }
+        }
+    }
+
+    private func weightedTagLinks(title: String, tags: [ListenBrainzArtistTag]) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.custom("Avenir Next Medium", size: 13))
+                .foregroundStyle(.secondary)
+            FlowLayout(spacing: 6) {
+                ForEach(tags) { tag in
+                    HStack(spacing: 7) {
+                        Text(tag.name)
+                            .font(.custom("Avenir Next Medium", size: 13))
+                        Text("\(tag.count)")
+                            .font(.custom("Avenir Next Medium", size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.white.opacity(0.06), in: Capsule())
+                }
+            }
+        }
+    }
+
+    private func preferredArtistLinks(_ links: [ListenBrainzArtistLink]) -> [ListenBrainzArtistLink] {
+        let priority = ["Official Homepage", "Youtube", "Streaming", "Social Network", "Wikidata"]
+        return links.sorted { lhs, rhs in
+            let left = priority.firstIndex(of: lhs.title) ?? priority.count
+            let right = priority.firstIndex(of: rhs.title) ?? priority.count
+            if left == right {
+                return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
+            }
+            return left < right
         }
     }
 
@@ -2241,6 +2380,10 @@ private struct ScrobbleDetailPanel: View {
                 stat("Global artist plays", enrichment.globalArtistListenCount)
             }
 
+            if let profile = enrichment.artistProfile {
+                listenBrainzArtistProfileSection(profile)
+            }
+
             if !enrichment.similarArtists.isEmpty {
                 Text("Similar Artists")
                     .font(.custom("Avenir Next Medium", size: 15))
@@ -2251,6 +2394,37 @@ private struct ScrobbleDetailPanel: View {
                 Text("Top Tracks By This Artist")
                     .font(.custom("Avenir Next Medium", size: 15))
                 openPopularRecordingsGrid(enrichment.topArtistRecordings, compact: metrics.isCompact)
+            }
+        }
+        .padding(10)
+        .background(Color.white.opacity(0.035), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private func listenBrainzArtistProfileSection(_ profile: ListenBrainzArtistProfile) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Artist Profile")
+                .font(.custom("Avenir Next Medium", size: 15))
+
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), alignment: .leading)], alignment: .leading, spacing: 8) {
+                metadataCell("Formed", profile.beginYear.map(String.init))
+                metadataCell("Area", profile.area)
+                metadataCell("Type", profile.type)
+            }
+
+            if !profile.tags.isEmpty {
+                weightedTagLinks(title: "ListenBrainz tags", tags: Array(profile.tags.prefix(10)))
+            }
+
+            let links = preferredArtistLinks(profile.links)
+            if !links.isEmpty {
+                HStack(spacing: 8) {
+                    ForEach(links.prefix(5)) { link in
+                        Button(link.title) {
+                            openURL(link.url)
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                }
             }
         }
         .padding(10)
@@ -2282,33 +2456,69 @@ private struct ScrobbleDetailPanel: View {
     }
 
     private func similarArtistsGrid(_ artists: [CompatibilitySimilarArtist], compact: Bool) -> some View {
-        let columns = compact
-            ? [GridItem(.adaptive(minimum: 88), spacing: 14, alignment: .topLeading)]
-            : [GridItem(.adaptive(minimum: 90), spacing: 16, alignment: .topLeading)]
+        Group {
+            if artists.count >= 3 {
+                SimilarArtistGraphView(
+                    centerName: item.artist,
+                    nodes: Array(artists.prefix(compact ? 8 : 12)).enumerated().map { index, artist in
+                        SimilarArtistGraphNode(
+                            id: "\(index)-\(artist.id)",
+                            name: artist.name,
+                            value: Double(max(1, artists.count - index)),
+                            imageURL: artist.imageURL
+                        )
+                    },
+                    compact: compact
+                )
+                .frame(height: compact ? 300 : 360)
+            } else {
+                let columns = compact
+                    ? [GridItem(.adaptive(minimum: 88), spacing: 14, alignment: .topLeading)]
+                    : [GridItem(.adaptive(minimum: 90), spacing: 16, alignment: .topLeading)]
 
-        return LazyVGrid(columns: columns, alignment: .leading, spacing: 14) {
-            ForEach(artists.prefix(compact ? 6 : 8)) { similar in
-                similarArtistLink(similar)
+                LazyVGrid(columns: columns, alignment: .leading, spacing: 14) {
+                    ForEach(artists.prefix(compact ? 6 : 8)) { similar in
+                        similarArtistLink(similar)
+                    }
+                }
             }
         }
     }
 
     private func openSimilarArtistsGrid(_ artists: [ListenBrainzSimilarArtist], compact: Bool) -> some View {
-        let columns = compact
-            ? [GridItem(.adaptive(minimum: 118), spacing: 14, alignment: .topLeading)]
-            : [GridItem(.adaptive(minimum: 132), spacing: 16, alignment: .topLeading)]
+        Group {
+            if artists.count >= 3 {
+                SimilarArtistGraphView(
+                    centerName: item.artist,
+                    nodes: Array(artists.prefix(compact ? 8 : 12)).enumerated().map { index, artist in
+                        SimilarArtistGraphNode(
+                            id: "\(index)-\(artist.id)",
+                            name: artist.name,
+                            value: Double(max(1, artist.totalListenCount)),
+                            imageURL: artist.imageURL
+                        )
+                    },
+                    compact: compact
+                )
+                .frame(height: compact ? 300 : 360)
+            } else {
+                let columns = compact
+                    ? [GridItem(.adaptive(minimum: 118), spacing: 14, alignment: .topLeading)]
+                    : [GridItem(.adaptive(minimum: 132), spacing: 16, alignment: .topLeading)]
 
-        return LazyVGrid(columns: columns, alignment: .leading, spacing: 14) {
-            ForEach(artists.prefix(compact ? 6 : 8)) { artist in
-                VStack(alignment: .leading, spacing: 4) {
-                    artworkThumbnail(artist.imageURL, size: 74)
-                    Text(artist.name)
-                        .font(.custom("Avenir Next Medium", size: 12))
-                        .lineLimit(2)
-                    Text("\(artist.totalListenCount.formatted()) plays")
-                        .font(.custom("Avenir Next Regular", size: 11))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                LazyVGrid(columns: columns, alignment: .leading, spacing: 14) {
+                    ForEach(artists.prefix(compact ? 6 : 8)) { artist in
+                        VStack(alignment: .leading, spacing: 4) {
+                            artworkThumbnail(artist.imageURL, size: 74)
+                            Text(artist.name)
+                                .font(.custom("Avenir Next Medium", size: 12))
+                                .lineLimit(2)
+                            Text("\(artist.totalListenCount.formatted()) plays")
+                                .font(.custom("Avenir Next Regular", size: 11))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                    }
                 }
             }
         }
@@ -2431,6 +2641,40 @@ private struct ScrobbleDetailPanel: View {
                         .background(Color.white.opacity(0.06), in: Capsule())
                 }
             }
+        }
+    }
+
+    private func weightedTagLinks(title: String, tags: [ListenBrainzArtistTag]) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.custom("Avenir Next Medium", size: 13))
+                .foregroundStyle(.secondary)
+            FlowLayout(spacing: 6) {
+                ForEach(tags) { tag in
+                    HStack(spacing: 7) {
+                        Text(tag.name)
+                            .font(.custom("Avenir Next Medium", size: 13))
+                        Text("\(tag.count)")
+                            .font(.custom("Avenir Next Medium", size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.white.opacity(0.06), in: Capsule())
+                }
+            }
+        }
+    }
+
+    private func preferredArtistLinks(_ links: [ListenBrainzArtistLink]) -> [ListenBrainzArtistLink] {
+        let priority = ["Official Homepage", "Youtube", "Streaming", "Social Network", "Wikidata"]
+        return links.sorted { lhs, rhs in
+            let left = priority.firstIndex(of: lhs.title) ?? priority.count
+            let right = priority.firstIndex(of: rhs.title) ?? priority.count
+            if left == right {
+                return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
+            }
+            return left < right
         }
     }
 
@@ -5430,6 +5674,174 @@ private struct ListenBrainzSocialView: View {
     }
 }
 
+private struct SimilarArtistGraphNode: Identifiable, Equatable {
+    let id: String
+    let name: String
+    let value: Double
+    let imageURL: String?
+}
+
+private struct SimilarArtistGraphView: View {
+    @Environment(\.colorScheme) private var colorScheme
+    let centerName: String
+    let nodes: [SimilarArtistGraphNode]
+    let compact: Bool
+
+    private var visibleNodes: [SimilarArtistGraphNode] {
+        Array(nodes.prefix(compact ? 8 : 14))
+    }
+
+    var body: some View {
+        GeometryReader { proxy in
+            let layout = graphLayout(in: proxy.size)
+            ZStack {
+                graphBackground
+
+                ForEach(visibleNodes) { node in
+                    if let point = layout.nodePositions[node.id] {
+                        Path { path in
+                            path.move(to: layout.center)
+                            path.addLine(to: point)
+                        }
+                        .stroke(edgeColor(for: node).opacity(colorScheme == .dark ? 0.46 : 0.34), lineWidth: 1.25)
+                    }
+                }
+
+                ForEach(clusterEdges(in: layout.nodePositions), id: \.0) { edge in
+                    if let from = layout.nodePositions[edge.0], let to = layout.nodePositions[edge.1] {
+                        Path { path in
+                            path.move(to: from)
+                            path.addLine(to: to)
+                        }
+                        .stroke(Color.secondary.opacity(0.18), lineWidth: 1)
+                    }
+                }
+
+                artistNode(
+                    title: centerName,
+                    fill: Color(red: 0.24, green: 0.20, blue: 0.50),
+                    textColor: .white,
+                    size: layout.centerSize,
+                    fontSize: compact ? 20 : 25
+                )
+                .position(layout.center)
+
+                ForEach(Array(visibleNodes.enumerated()), id: \.element.id) { index, node in
+                    if let point = layout.nodePositions[node.id] {
+                        artistNode(
+                            title: node.name,
+                            fill: nodeFill(index: index, node: node),
+                            textColor: nodeTextColor(index: index),
+                            size: layout.nodeSizes[node.id] ?? 72,
+                            fontSize: compact ? 11 : 13
+                        )
+                        .position(point)
+                    }
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+    }
+
+    private var graphBackground: some View {
+        LinearGradient(
+            colors: colorScheme == .dark
+                ? [Color.white.opacity(0.04), Color.white.opacity(0.015)]
+                : [Color.white.opacity(0.82), Color(red: 0.91, green: 0.94, blue: 0.99)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(Color.secondary.opacity(0.16), lineWidth: 1)
+        }
+    }
+
+    private func artistNode(
+        title: String,
+        fill: Color,
+        textColor: Color,
+        size: CGFloat,
+        fontSize: CGFloat
+    ) -> some View {
+        ZStack {
+            Circle()
+                .fill(fill)
+                .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.24 : 0.10), radius: 7, x: 0, y: 4)
+            Text(title)
+                .font(.custom("Avenir Next Medium", size: fontSize))
+                .foregroundStyle(textColor)
+                .multilineTextAlignment(.center)
+                .lineLimit(3)
+                .minimumScaleFactor(0.68)
+                .padding(.horizontal, 8)
+        }
+        .frame(width: size, height: size)
+        .contentShape(Circle())
+        .help(title)
+    }
+
+    private struct GraphLayout {
+        let center: CGPoint
+        let centerSize: CGFloat
+        let nodePositions: [String: CGPoint]
+        let nodeSizes: [String: CGFloat]
+    }
+
+    private func graphLayout(in size: CGSize) -> GraphLayout {
+        let center = CGPoint(x: size.width * 0.52, y: size.height * 0.53)
+        let centerSize = min(compact ? 108 : 136, min(size.width, size.height) * 0.34)
+        let baseRadius = max(92, min(size.width, size.height) * (compact ? 0.34 : 0.38))
+        let maxValue = max(1, visibleNodes.map(\.value).max() ?? 1)
+        var positions: [String: CGPoint] = [:]
+        var sizes: [String: CGFloat] = [:]
+
+        for (index, node) in visibleNodes.enumerated() {
+            let count = max(1, visibleNodes.count)
+            let spread = count > 10 ? 0.94 : 0.88
+            let angle = (2 * Double.pi * (Double(index) / Double(count))) - Double.pi / 2
+            let radiusJitter = CGFloat(index % 3) * (compact ? 8 : 14)
+            let radius = baseRadius * spread + radiusJitter
+            let x = center.x + CGFloat(cos(angle)) * radius
+            let y = center.y + CGFloat(sin(angle)) * radius * (compact ? 0.86 : 0.92)
+            positions[node.id] = CGPoint(
+                x: min(max(x, 44), size.width - 44),
+                y: min(max(y, 44), size.height - 44)
+            )
+            let normalized = CGFloat(node.value / maxValue)
+            sizes[node.id] = (compact ? 62 : 76) + normalized * (compact ? 18 : 26)
+        }
+
+        return GraphLayout(center: center, centerSize: centerSize, nodePositions: positions, nodeSizes: sizes)
+    }
+
+    private func clusterEdges(in positions: [String: CGPoint]) -> [(String, String)] {
+        guard visibleNodes.count >= 6 else { return [] }
+        return stride(from: 1, to: visibleNodes.count, by: 4).compactMap { index in
+            guard index + 1 < visibleNodes.count else { return nil }
+            return (visibleNodes[index].id, visibleNodes[index + 1].id)
+        }
+    }
+
+    private func nodeFill(index: Int, node: SimilarArtistGraphNode) -> Color {
+        let palette: [Color] = [
+            Color(red: 0.48, green: 0.59, blue: 0.82),
+            Color(red: 0.50, green: 0.54, blue: 0.64),
+            Color(red: 0.54, green: 0.52, blue: 0.44),
+            Color(red: 0.42, green: 0.52, blue: 0.77)
+        ]
+        return palette[index % palette.count].opacity(node.imageURL == nil ? 0.92 : 1)
+    }
+
+    private func nodeTextColor(index: Int) -> Color {
+        index % 4 == 0 ? Color.primary.opacity(colorScheme == .dark ? 0.95 : 0.78) : .white
+    }
+
+    private func edgeColor(for node: SimilarArtistGraphNode) -> Color {
+        node.imageURL == nil ? .secondary : Color(red: 0.48, green: 0.58, blue: 0.82)
+    }
+}
+
 private struct ListenBrainzRecommendationComposerView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var scrobbleService: ScrobbleService
@@ -6354,41 +6766,48 @@ private struct CachedAsyncImage<Content: View, Placeholder: View>: View {
     let content: (Image) -> Content
     let placeholder: () -> Placeholder
     @State private var image: NSImage?
-    @State private var failed = false
+    @State private var loadedURL: URL?
+    @State private var failedURL: URL?
 
     var body: some View {
         Group {
-            if let image {
+            if let image, loadedURL == url {
                 content(Image(nsImage: image))
             } else {
                 placeholder()
             }
         }
         .task(id: url) {
-            await load()
+            await load(url)
         }
     }
 
-    private func load() async {
-        guard image == nil, !failed else { return }
-        let request = URLRequest(url: url, cachePolicy: .returnCacheDataElseLoad, timeoutInterval: 18)
+    private func load(_ targetURL: URL) async {
+        guard loadedURL != targetURL, failedURL != targetURL else { return }
+        image = nil
+        loadedURL = nil
+        failedURL = nil
+
+        let request = URLRequest(url: targetURL, cachePolicy: .returnCacheDataElseLoad, timeoutInterval: 12)
 
         if let cached = URLCache.shared.cachedResponse(for: request),
            let decoded = NSImage(data: cached.data) {
             image = decoded
+            loadedURL = targetURL
             return
         }
 
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
             guard let decoded = NSImage(data: data) else {
-                failed = true
+                failedURL = targetURL
                 return
             }
             URLCache.shared.storeCachedResponse(CachedURLResponse(response: response, data: data), for: request)
             image = decoded
+            loadedURL = targetURL
         } catch {
-            failed = true
+            failedURL = targetURL
         }
     }
 }

@@ -57,6 +57,7 @@ struct OpenListeningEnrichment: Equatable {
     let globalArtistListenerCount: Int?
     let globalReleaseListenCount: Int?
     let globalReleaseListenerCount: Int?
+    let artistProfile: ListenBrainzArtistProfile?
     let topArtistRecordings: [ListenBrainzPopularRecording]
     let similarArtists: [ListenBrainzSimilarArtist]
 
@@ -70,6 +71,7 @@ struct OpenListeningEnrichment: Equatable {
         globalArtistListenerCount: nil,
         globalReleaseListenCount: nil,
         globalReleaseListenerCount: nil,
+        artistProfile: nil,
         topArtistRecordings: [],
         similarArtists: []
     )
@@ -81,6 +83,7 @@ struct OpenListeningEnrichment: Equatable {
             globalRecordingListenCount != nil ||
             globalArtistListenCount != nil ||
             globalReleaseListenCount != nil ||
+            artistProfile != nil ||
             !topArtistRecordings.isEmpty ||
             !similarArtists.isEmpty
     }
@@ -94,6 +97,7 @@ private struct OpenArtistFallback {
     let playcount: Int?
     let userPlaycount: Int?
     let tags: [String]
+    let profile: ListenBrainzArtistProfile?
     let similarArtists: [ListenBrainzSimilarArtist]
 }
 
@@ -1862,7 +1866,9 @@ final class ScrobbleService: ObservableObject {
 
         let topRecordings: [ListenBrainzPopularRecording]
         let similarArtists: [ListenBrainzSimilarArtist]
+        let artistProfile: ListenBrainzArtistProfile?
         if let artistMBID = details.artistMBID?.nilIfBlank {
+            artistProfile = try? await listenBrainz.fetchArtistProfile(artistMBID: artistMBID)
             topRecordings = (try? await listenBrainz.fetchPopularRecordingsForArtist(
                 artistMBID: artistMBID,
                 count: 8
@@ -1874,6 +1880,7 @@ final class ScrobbleService: ObservableObject {
             )) ?? []
             similarArtists = await hydrateListenBrainzSimilarArtistImages(rawSimilarArtists)
         } else {
+            artistProfile = nil
             topRecordings = []
             similarArtists = []
         }
@@ -1888,6 +1895,7 @@ final class ScrobbleService: ObservableObject {
             globalArtistListenerCount: artistPopularity?.totalUserCount,
             globalReleaseListenCount: releasePopularity?.totalListenCount,
             globalReleaseListenerCount: releasePopularity?.totalUserCount,
+            artistProfile: artistProfile,
             topArtistRecordings: topRecordings,
             similarArtists: similarArtists
         )
@@ -1905,7 +1913,8 @@ final class ScrobbleService: ObservableObject {
             listeners: enrichment?.globalArtistListenerCount,
             playcount: enrichment?.globalArtistListenCount,
             userPlaycount: enrichment?.userArtistListenCount,
-            tags: details.tags,
+            tags: enrichment?.artistProfile?.tags.map(\.name) ?? details.tags,
+            profile: enrichment?.artistProfile,
             similarArtists: enrichment?.similarArtists ?? []
         )
     }
@@ -1943,6 +1952,12 @@ final class ScrobbleService: ObservableObject {
         }
         if let plays = fallback.playcount {
             fragments.append("\(plays.formatted()) public plays")
+        }
+        if let beginYear = fallback.profile?.beginYear {
+            fragments.append("Active since \(beginYear)")
+        }
+        if let area = fallback.profile?.area {
+            fragments.append("Area: \(area)")
         }
         if !fallback.tags.isEmpty {
             fragments.append("Tags: \(fallback.tags.prefix(5).joined(separator: ", "))")

@@ -310,6 +310,54 @@ final class ListenBrainzServiceTests: XCTestCase {
         XCTAssertEqual(top.first?.imageURL, "https://coverartarchive.org/release/cover-release/front-250")
     }
 
+    func testFetchArtistProfileDecodesListenBrainzMetadata() async throws {
+        let service = makeService(tokenStore: TestListenBrainzTokenStore(token: "token")) { request in
+            XCTAssertEqual(request.url?.path, "/1/metadata/artist")
+            XCTAssertTrue(request.url?.query?.contains("artist_mbids=artist-1") == true)
+            XCTAssertTrue(request.url?.query?.contains("inc=artist%20tag%20release") == true)
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            let payload = """
+            [
+              {
+                "area": "United Kingdom",
+                "artist_mbid": "artist-1",
+                "begin_year": 1967,
+                "mbid": "artist-1",
+                "name": "Jethro Tull",
+                "rels": {
+                  "official homepage": "https://jethrotull.com/",
+                  "youtube": "https://www.youtube.com/channel/example",
+                  "wikidata": "https://www.wikidata.org/wiki/Q192353"
+                },
+                "tag": {
+                  "artist": [
+                    { "artist_mbid": "artist-1", "count": 15, "genre_mbid": "genre-1", "tag": "progressive rock" },
+                    { "artist_mbid": "artist-1", "count": 5, "tag": "rock" }
+                  ]
+                },
+                "type": "Group"
+              }
+            ]
+            """
+            return (response, Data(payload.utf8))
+        }
+
+        let profile = try await service.fetchArtistProfile(artistMBID: "artist-1")
+
+        XCTAssertEqual(profile?.name, "Jethro Tull")
+        XCTAssertEqual(profile?.area, "United Kingdom")
+        XCTAssertEqual(profile?.beginYear, 1967)
+        XCTAssertEqual(profile?.type, "Group")
+        XCTAssertEqual(profile?.tags.map(\.name), ["progressive rock", "rock"])
+        XCTAssertEqual(profile?.tags.first?.count, 15)
+        XCTAssertTrue(profile?.links.contains { $0.title == "Official Homepage" } == true)
+    }
+
     func testRecommendRecordingPostsRecipientsAndBlurb() async throws {
         let service = makeService(tokenStore: TestListenBrainzTokenStore(token: "token")) { request in
             XCTAssertEqual(request.httpMethod, "POST")
